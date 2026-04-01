@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "CUPHY - Web App"
+version = "1.0.0"
+id = "artifacts/cuphy-web"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21183
+
+[services.development]
+run = "pnpm --filter @workspace/cuphy-web run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/cuphy-web", "run", "build" ]
+publicDir = "artifacts/cuphy-web/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21183"
+BASE_PATH = "/"

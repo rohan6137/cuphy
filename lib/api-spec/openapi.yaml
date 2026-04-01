@@ -1,22 +1,39 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.1.0
-  description: API specification
+  version: 1.0.0
+  description: CUPHY EduTech Platform API for Calcutta University Physics Honours Students
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication operations
+  - name: users
+    description: User management
+  - name: batches
+    description: Batch management
+  - name: subjects
+    description: Subject management
+  - name: lectures
+    description: Video lectures
+  - name: notes
+    description: PDF notes
+  - name: tests
+    description: Tests and quizzes
+  - name: notices
+    description: Notices and announcements
+  - name: admin
+    description: Admin panel operations
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +41,934 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # AUTH
+  /auth/request-otp:
+    post:
+      operationId: requestOtp
+      tags: [auth]
+      summary: Request OTP for phone number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestOtpBody"
+      responses:
+        "200":
+          description: OTP sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/verify-otp:
+    post:
+      operationId: verifyOtp
+      tags: [auth]
+      summary: Verify OTP and login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyOtpBody"
+      responses:
+        "200":
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+
+  /auth/login:
+    post:
+      operationId: loginWithPassword
+      tags: [auth]
+      summary: Login with phone and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginBody"
+      responses:
+        "200":
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout and invalidate session
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current authenticated user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # USERS
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List all users (admin)
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: batchId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserListResponse"
+
+  /users/{userId}:
+    get:
+      operationId: getUserById
+      tags: [users]
+      summary: Get user by ID
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: User
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserDetail"
+    put:
+      operationId: updateUser
+      tags: [users]
+      summary: Update user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserBody"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    delete:
+      operationId: deleteUser
+      tags: [users]
+      summary: Delete user (admin)
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /users/profile:
+    put:
+      operationId: updateProfile
+      tags: [users]
+      summary: Update own profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  # BATCHES
+  /batches:
+    get:
+      operationId: listBatches
+      tags: [batches]
+      summary: List all batches
+      parameters:
+        - name: semester
+          in: query
+          schema:
+            type: integer
+        - name: isActive
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: List of batches
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchListResponse"
+    post:
+      operationId: createBatch
+      tags: [batches]
+      summary: Create new batch (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBatchBody"
+      responses:
+        "201":
+          description: Created batch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Batch"
+
+  /batches/{batchId}:
+    get:
+      operationId: getBatchById
+      tags: [batches]
+      summary: Get batch by ID
+      parameters:
+        - name: batchId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Batch detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchDetail"
+    put:
+      operationId: updateBatch
+      tags: [batches]
+      summary: Update batch (admin)
+      parameters:
+        - name: batchId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBatchBody"
+      responses:
+        "200":
+          description: Updated batch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Batch"
+    delete:
+      operationId: deleteBatch
+      tags: [batches]
+      summary: Delete batch (admin)
+      parameters:
+        - name: batchId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /batches/{batchId}/enroll:
+    post:
+      operationId: enrollInBatch
+      tags: [batches]
+      summary: Enroll user in batch (admin)
+      parameters:
+        - name: batchId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnrollUserBody"
+      responses:
+        "200":
+          description: Enrolled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /batches/{batchId}/unenroll:
+    post:
+      operationId: unenrollFromBatch
+      tags: [batches]
+      summary: Remove user from batch (admin)
+      parameters:
+        - name: batchId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnrollUserBody"
+      responses:
+        "200":
+          description: Unenrolled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /batches/my-batches:
+    get:
+      operationId: getMyBatches
+      tags: [batches]
+      summary: Get batches enrolled by current user
+      responses:
+        "200":
+          description: Enrolled batches
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchListResponse"
+
+  # SUBJECTS
+  /subjects:
+    get:
+      operationId: listSubjects
+      tags: [subjects]
+      summary: List subjects
+      parameters:
+        - name: batchId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Subjects
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubjectListResponse"
+    post:
+      operationId: createSubject
+      tags: [subjects]
+      summary: Create subject (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSubjectBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subject"
+
+  /subjects/{subjectId}:
+    put:
+      operationId: updateSubject
+      tags: [subjects]
+      summary: Update subject (admin)
+      parameters:
+        - name: subjectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSubjectBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subject"
+    delete:
+      operationId: deleteSubject
+      tags: [subjects]
+      summary: Delete subject (admin)
+      parameters:
+        - name: subjectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  # LECTURES
+  /lectures:
+    get:
+      operationId: listLectures
+      tags: [lectures]
+      summary: List lectures
+      parameters:
+        - name: subjectId
+          in: query
+          schema:
+            type: integer
+        - name: batchId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Lectures
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LectureListResponse"
+    post:
+      operationId: createLecture
+      tags: [lectures]
+      summary: Create lecture (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLectureBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lecture"
+
+  /lectures/{lectureId}:
+    get:
+      operationId: getLectureById
+      tags: [lectures]
+      summary: Get lecture by ID
+      parameters:
+        - name: lectureId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Lecture
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lecture"
+    put:
+      operationId: updateLecture
+      tags: [lectures]
+      summary: Update lecture (admin)
+      parameters:
+        - name: lectureId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLectureBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lecture"
+    delete:
+      operationId: deleteLecture
+      tags: [lectures]
+      summary: Delete lecture (admin)
+      parameters:
+        - name: lectureId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  # NOTES
+  /notes:
+    get:
+      operationId: listNotes
+      tags: [notes]
+      summary: List PDF notes
+      parameters:
+        - name: subjectId
+          in: query
+          schema:
+            type: integer
+        - name: batchId
+          in: query
+          schema:
+            type: integer
+        - name: category
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Notes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NoteListResponse"
+    post:
+      operationId: createNote
+      tags: [notes]
+      summary: Create note (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNoteBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Note"
+
+  /notes/{noteId}:
+    put:
+      operationId: updateNote
+      tags: [notes]
+      summary: Update note (admin)
+      parameters:
+        - name: noteId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNoteBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Note"
+    delete:
+      operationId: deleteNote
+      tags: [notes]
+      summary: Delete note (admin)
+      parameters:
+        - name: noteId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  # TESTS
+  /tests:
+    get:
+      operationId: listTests
+      tags: [tests]
+      summary: List tests
+      parameters:
+        - name: batchId
+          in: query
+          schema:
+            type: integer
+        - name: subjectId
+          in: query
+          schema:
+            type: integer
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [test, quiz]
+      responses:
+        "200":
+          description: Tests
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestListResponse"
+    post:
+      operationId: createTest
+      tags: [tests]
+      summary: Create test (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTestBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Test"
+
+  /tests/{testId}:
+    get:
+      operationId: getTestById
+      tags: [tests]
+      summary: Get test with questions
+      parameters:
+        - name: testId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Test detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestDetail"
+    put:
+      operationId: updateTest
+      tags: [tests]
+      summary: Update test (admin)
+      parameters:
+        - name: testId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTestBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Test"
+    delete:
+      operationId: deleteTest
+      tags: [tests]
+      summary: Delete test (admin)
+      parameters:
+        - name: testId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /tests/{testId}/submit:
+    post:
+      operationId: submitTest
+      tags: [tests]
+      summary: Submit test answers
+      parameters:
+        - name: testId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitTestBody"
+      responses:
+        "200":
+          description: Result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestResult"
+
+  /tests/{testId}/results:
+    get:
+      operationId: getTestResults
+      tags: [tests]
+      summary: Get test results for a test (admin)
+      parameters:
+        - name: testId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestResultListResponse"
+
+  /tests/my-results:
+    get:
+      operationId: getMyTestResults
+      tags: [tests]
+      summary: Get own test results
+      responses:
+        "200":
+          description: Results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestResultListResponse"
+
+  # NOTICES
+  /notices:
+    get:
+      operationId: listNotices
+      tags: [notices]
+      summary: List notices
+      parameters:
+        - name: batchId
+          in: query
+          schema:
+            type: integer
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [notice, offer]
+      responses:
+        "200":
+          description: Notices
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NoticeListResponse"
+    post:
+      operationId: createNotice
+      tags: [notices]
+      summary: Create notice (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNoticeBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notice"
+
+  /notices/{noticeId}:
+    put:
+      operationId: updateNotice
+      tags: [notices]
+      summary: Update notice (admin)
+      parameters:
+        - name: noticeId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNoticeBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notice"
+    delete:
+      operationId: deleteNotice
+      tags: [notices]
+      summary: Delete notice (admin)
+      parameters:
+        - name: noticeId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  # ADMIN
+  /admin/dashboard-stats:
+    get:
+      operationId: getDashboardStats
+      tags: [admin]
+      summary: Get admin dashboard statistics
+      responses:
+        "200":
+          description: Dashboard stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+
+  /admin/app-settings:
+    get:
+      operationId: getAppSettings
+      tags: [admin]
+      summary: Get app settings/theme
+      responses:
+        "200":
+          description: App settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppSettings"
+    put:
+      operationId: updateAppSettings
+      tags: [admin]
+      summary: Update app settings/theme (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AppSettings"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppSettings"
+
+  /admin/recent-activity:
+    get:
+      operationId: getRecentActivity
+      tags: [admin]
+      summary: Get recent platform activity
+      responses:
+        "200":
+          description: Recent activity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecentActivityResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +976,723 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required: [message]
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+
+    # AUTH SCHEMAS
+    RequestOtpBody:
+      type: object
+      properties:
+        phone:
+          type: string
+      required: [phone]
+
+    VerifyOtpBody:
+      type: object
+      properties:
+        phone:
+          type: string
+        otp:
+          type: string
+      required: [phone, otp]
+
+    LoginBody:
+      type: object
+      properties:
+        phone:
+          type: string
+        password:
+          type: string
+      required: [phone, password]
+
+    AuthResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        token:
+          type: string
+      required: [user, token]
+
+    # USER SCHEMAS
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [student, admin]
+        semester:
+          type: integer
+        profilePicture:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+      required: [id, name, phone, role, isActive, createdAt]
+
+    UserDetail:
+      allOf:
+        - $ref: "#/components/schemas/User"
+        - type: object
+          properties:
+            enrolledBatches:
+              type: array
+              items:
+                $ref: "#/components/schemas/Batch"
+            testResultsCount:
+              type: integer
+
+    UpdateUserBody:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        semester:
+          type: integer
+        isActive:
+          type: boolean
+        role:
+          type: string
+          enum: [student, admin]
+
+    UpdateProfileBody:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        semester:
+          type: integer
+
+    UserListResponse:
+      type: object
+      properties:
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+      required: [users, total, page, limit]
+
+    # BATCH SCHEMAS
+    Batch:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        semester:
+          type: integer
+        thumbnail:
+          type: string
+          nullable: true
+        price:
+          type: number
+        originalPrice:
+          type: number
+          nullable: true
+        paymentLink:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+        expiresAt:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+        studentsCount:
+          type: integer
+      required: [id, name, semester, price, isActive, createdAt, studentsCount]
+
+    BatchDetail:
+      allOf:
+        - $ref: "#/components/schemas/Batch"
+        - type: object
+          properties:
+            subjects:
+              type: array
+              items:
+                $ref: "#/components/schemas/Subject"
+            totalLectures:
+              type: integer
+            totalNotes:
+              type: integer
+            totalTests:
+              type: integer
+
+    CreateBatchBody:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        semester:
+          type: integer
+        thumbnail:
+          type: string
+          nullable: true
+        price:
+          type: number
+        originalPrice:
+          type: number
+          nullable: true
+        paymentLink:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+        expiresAt:
+          type: string
+          nullable: true
+      required: [name, semester, price, isActive]
+
+    UpdateBatchBody:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        semester:
+          type: integer
+        thumbnail:
+          type: string
+          nullable: true
+        price:
+          type: number
+        originalPrice:
+          type: number
+          nullable: true
+        paymentLink:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+        expiresAt:
+          type: string
+          nullable: true
+
+    EnrollUserBody:
+      type: object
+      properties:
+        userId:
+          type: integer
+      required: [userId]
+
+    BatchListResponse:
+      type: object
+      properties:
+        batches:
+          type: array
+          items:
+            $ref: "#/components/schemas/Batch"
+        total:
+          type: integer
+      required: [batches, total]
+
+    # SUBJECT SCHEMAS
+    Subject:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        batchId:
+          type: integer
+        icon:
+          type: string
+          nullable: true
+        order:
+          type: integer
+        lecturesCount:
+          type: integer
+        notesCount:
+          type: integer
+      required: [id, name, batchId, order, lecturesCount, notesCount]
+
+    CreateSubjectBody:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        batchId:
+          type: integer
+        icon:
+          type: string
+          nullable: true
+        order:
+          type: integer
+      required: [name, batchId, order]
+
+    SubjectListResponse:
+      type: object
+      properties:
+        subjects:
+          type: array
+          items:
+            $ref: "#/components/schemas/Subject"
+      required: [subjects]
+
+    # LECTURE SCHEMAS
+    Lecture:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        youtubeVideoId:
+          type: string
+        subjectId:
+          type: integer
+        batchId:
+          type: integer
+        duration:
+          type: string
+          nullable: true
+        order:
+          type: integer
+        isFree:
+          type: boolean
+        createdAt:
+          type: string
+      required: [id, title, youtubeVideoId, subjectId, batchId, order, isFree, createdAt]
+
+    CreateLectureBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        youtubeVideoId:
+          type: string
+        subjectId:
+          type: integer
+        batchId:
+          type: integer
+        duration:
+          type: string
+          nullable: true
+        order:
+          type: integer
+        isFree:
+          type: boolean
+      required: [title, youtubeVideoId, subjectId, batchId, order, isFree]
+
+    LectureListResponse:
+      type: object
+      properties:
+        lectures:
+          type: array
+          items:
+            $ref: "#/components/schemas/Lecture"
+      required: [lectures]
+
+    # NOTE SCHEMAS
+    Note:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        pdfUrl:
+          type: string
+        subjectId:
+          type: integer
+        batchId:
+          type: integer
+        category:
+          type: string
+          nullable: true
+        isFree:
+          type: boolean
+        createdAt:
+          type: string
+      required: [id, title, pdfUrl, subjectId, batchId, isFree, createdAt]
+
+    CreateNoteBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        pdfUrl:
+          type: string
+        subjectId:
+          type: integer
+        batchId:
+          type: integer
+        category:
+          type: string
+          nullable: true
+        isFree:
+          type: boolean
+      required: [title, pdfUrl, subjectId, batchId, isFree]
+
+    NoteListResponse:
+      type: object
+      properties:
+        notes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Note"
+      required: [notes]
+
+    # TEST SCHEMAS
+    Question:
+      type: object
+      properties:
+        id:
+          type: integer
+        text:
+          type: string
+        optionA:
+          type: string
+        optionB:
+          type: string
+        optionC:
+          type: string
+        optionD:
+          type: string
+        correctOption:
+          type: string
+          enum: [A, B, C, D]
+        explanation:
+          type: string
+          nullable: true
+        marks:
+          type: number
+      required: [id, text, optionA, optionB, optionC, optionD, correctOption, marks]
+
+    QuestionInput:
+      type: object
+      properties:
+        text:
+          type: string
+        optionA:
+          type: string
+        optionB:
+          type: string
+        optionC:
+          type: string
+        optionD:
+          type: string
+        correctOption:
+          type: string
+          enum: [A, B, C, D]
+        explanation:
+          type: string
+          nullable: true
+        marks:
+          type: number
+      required: [text, optionA, optionB, optionC, optionD, correctOption, marks]
+
+    Test:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        type:
+          type: string
+          enum: [test, quiz]
+        batchId:
+          type: integer
+        subjectId:
+          type: integer
+          nullable: true
+        totalMarks:
+          type: number
+        durationMinutes:
+          type: integer
+        isActive:
+          type: boolean
+        questionsCount:
+          type: integer
+        createdAt:
+          type: string
+      required: [id, title, type, batchId, totalMarks, durationMinutes, isActive, questionsCount, createdAt]
+
+    TestDetail:
+      allOf:
+        - $ref: "#/components/schemas/Test"
+        - type: object
+          properties:
+            questions:
+              type: array
+              items:
+                $ref: "#/components/schemas/Question"
+
+    CreateTestBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        type:
+          type: string
+          enum: [test, quiz]
+        batchId:
+          type: integer
+        subjectId:
+          type: integer
+          nullable: true
+        durationMinutes:
+          type: integer
+        isActive:
+          type: boolean
+        questions:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuestionInput"
+      required: [title, type, batchId, durationMinutes, isActive]
+
+    SubmitTestBody:
+      type: object
+      properties:
+        answers:
+          type: array
+          items:
+            type: object
+            properties:
+              questionId:
+                type: integer
+              selectedOption:
+                type: string
+                enum: [A, B, C, D]
+            required: [questionId, selectedOption]
+      required: [answers]
+
+    TestResult:
+      type: object
+      properties:
+        id:
+          type: integer
+        testId:
+          type: integer
+        userId:
+          type: integer
+        score:
+          type: number
+        totalMarks:
+          type: number
+        percentage:
+          type: number
+        timeTaken:
+          type: integer
+          nullable: true
+        submittedAt:
+          type: string
+      required: [id, testId, userId, score, totalMarks, percentage, submittedAt]
+
+    TestListResponse:
+      type: object
+      properties:
+        tests:
+          type: array
+          items:
+            $ref: "#/components/schemas/Test"
+      required: [tests]
+
+    TestResultListResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/TestResult"
+      required: [results]
+
+    # NOTICE SCHEMAS
+    Notice:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        content:
+          type: string
+        type:
+          type: string
+          enum: [notice, offer]
+        batchId:
+          type: integer
+          nullable: true
+        isActive:
+          type: boolean
+        expiresAt:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required: [id, title, content, type, isActive, createdAt]
+
+    CreateNoticeBody:
+      type: object
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+        type:
+          type: string
+          enum: [notice, offer]
+        batchId:
+          type: integer
+          nullable: true
+        isActive:
+          type: boolean
+        expiresAt:
+          type: string
+          nullable: true
+      required: [title, content, type, isActive]
+
+    NoticeListResponse:
+      type: object
+      properties:
+        notices:
+          type: array
+          items:
+            $ref: "#/components/schemas/Notice"
+      required: [notices]
+
+    # ADMIN SCHEMAS
+    DashboardStats:
+      type: object
+      properties:
+        totalStudents:
+          type: integer
+        totalBatches:
+          type: integer
+        totalLectures:
+          type: integer
+        totalNotes:
+          type: integer
+        totalTests:
+          type: integer
+        activeNotices:
+          type: integer
+        enrollmentsByBatch:
+          type: array
+          items:
+            type: object
+            properties:
+              batchId:
+                type: integer
+              batchName:
+                type: string
+              count:
+                type: integer
+            required: [batchId, batchName, count]
+        recentSignups:
+          type: integer
+      required: [totalStudents, totalBatches, totalLectures, totalNotes, totalTests, activeNotices, enrollmentsByBatch, recentSignups]
+
+    AppSettings:
+      type: object
+      properties:
+        primaryColor:
+          type: string
+        secondaryColor:
+          type: string
+        logoUrl:
+          type: string
+          nullable: true
+        appName:
+          type: string
+        tagline:
+          type: string
+          nullable: true
+        darkMode:
+          type: boolean
+      required: [primaryColor, secondaryColor, appName, darkMode]
+
+    ActivityItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [enrollment, signup, test_submitted, note_added, lecture_added]
+        description:
+          type: string
+        createdAt:
+          type: string
+        userId:
+          type: integer
+          nullable: true
+        userName:
+          type: string
+          nullable: true
+      required: [id, type, description, createdAt]
+
+    RecentActivityResponse:
+      type: object
+      properties:
+        activities:
+          type: array
+          items:
+            $ref: "#/components/schemas/ActivityItem"
+      required: [activities]
