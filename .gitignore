@@ -47,3 +47,9 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+build
+.next
+.env
+.env.local
+.firebase
+.vercel
