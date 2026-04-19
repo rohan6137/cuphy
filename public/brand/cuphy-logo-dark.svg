@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 512">
+<rect width="1200" height="512" fill="#0B0F1A"/>
+<circle cx="256" cy="256" r="220" fill="#FFFFFF"/>
+
+<g transform="translate(-14,0)">
+  <g transform="translate(248,256) scale(1.04) translate(-248,-256)">
+    <path d="M248 120 A140 140 0 1 0 248 392 L248 330 A78 78 0 1 1 248 182 Z" fill="#6C3BFF"/>
+  </g>
+  <g transform="translate(312,256) scale(1.05) translate(-312,-256)">
+    <path d="M268 120 H322 V364 Q322 392 295 392 H295 Q268 392 268 364 Z" fill="#00D4FF"/>
+    <path d="M322 120 H382 C428 120 452 158 452 206 C452 254 428 292 382 292 H322 V236 H366 C386 236 400 224 400 206 C400 188 386 176 366 176 H322 Z" fill="#00D4FF"/>
+  </g>
+</g>
+
+<text x="520" y="300" font-size="150" font-family="Arial, sans-serif" font-weight="900" fill="#6C3BFF">CUPHY</text>
+</svg>

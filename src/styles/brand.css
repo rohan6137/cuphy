@@ -1,0 +1,18 @@
+:root {
+  --brand-from: #6c3bff;
+  --brand-to: #00d4ff;
+}
+
+.brand-gradient {
+  background: linear-gradient(135deg, var(--brand-from), var(--brand-to));
+}
+
+.brand-gradient-text {
+  background: linear-gradient(135deg, var(--brand-from), var(--brand-to));
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+.brand-glow {
+  box-shadow: 0 10px 30px rgba(108, 59, 255, 0.2);
+}

@@ -1,0 +1,164 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userDocExists() {
+      return signedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function currentUserDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function isAdmin() {
+      return userDocExists() &&
+        (
+          currentUserDoc().data.isAdmin == true ||
+          currentUserDoc().data.role == "admin"
+        );
+    }
+
+    function currentUserEmail() {
+      return userDocExists() ? currentUserDoc().data.email : null;
+    }
+
+    function isCurrentUserByUidOrEmail(data) {
+      return signedIn() && (
+        (data.userUid != null && data.userUid == request.auth.uid) ||
+        (
+          data.userEmail != null &&
+          currentUserEmail() != null &&
+          data.userEmail == currentUserEmail()
+        )
+      );
+    }
+
+    match /users/{uid} {
+      allow read: if true;
+      allow create: if signedIn() && request.auth.uid == uid;
+      allow update: if (signedIn() && request.auth.uid == uid) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /users/{uid}/notificationReads/{notificationId} {
+      allow read, write: if (signedIn() && request.auth.uid == uid) || isAdmin();
+    }
+
+    match /batches/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /subjects/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /lectures/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /notes/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /pyqs/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /tests/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /testQuestions/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /notices/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /appSettings/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /notifications/{id} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /enrollments/{id} {
+      allow read: if isAdmin() || isCurrentUserByUidOrEmail(resource.data);
+
+      allow create: if signedIn() &&
+        request.resource.data.userUid != null &&
+        request.resource.data.userUid == request.auth.uid;
+
+      allow update, delete: if isAdmin();
+    }
+
+    match /subscriptions/{id} {
+      allow read: if isAdmin() || isCurrentUserByUidOrEmail(resource.data);
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /testResults/{id} {
+      allow read: if isAdmin() || (
+        signedIn() && (
+          (resource.data.userUid != null && resource.data.userUid == request.auth.uid) ||
+          (
+            resource.data.userEmail != null &&
+            currentUserEmail() != null &&
+            resource.data.userEmail == currentUserEmail()
+          )
+        )
+      );
+
+      allow create: if signedIn() &&
+        request.resource.data.userUid != null &&
+        request.resource.data.userUid == request.auth.uid;
+
+      allow update, delete: if isAdmin();
+    }
+
+    match /supportTickets/{id} {
+      allow read: if isAdmin() || (
+        signedIn() &&
+        resource.data.userUid != null &&
+        resource.data.userUid == request.auth.uid
+      );
+
+      allow create: if signedIn() &&
+        request.resource.data.userUid != null &&
+        request.resource.data.userUid == request.auth.uid;
+
+      allow update, delete: if isAdmin();
+    }
+
+    match /payments/{id} {
+      allow read: if isAdmin() || (
+        signedIn() &&
+        resource.data.userUid != null &&
+        resource.data.userUid == request.auth.uid
+      );
+
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+  }
+}
