@@ -615,601 +615,650 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
 
-async function loginWithPhone(phone: string, password: string) {
-  const normalizedPhone = normalizePhone(phone);
-  const internalEmail = getInternalEmailFromPhone(normalizedPhone);
+  async function loginWithPhone(phone: string, password: string) {
+    const normalizedPhone = normalizePhone(phone);
+    const internalEmail = getInternalEmailFromPhone(normalizedPhone);
 
-  try {
-    const credential = await signInWithEmailAndPassword(auth, internalEmail, password);
-    const syncedUser = await createOrSyncUserDoc(credential.user);
-
-    if (!syncedUser) {
-      await signOut(auth);
-      throw new Error("Account not found. Register first.");
-    }
-
-    if (!syncedUser.phone) {
-      await signOut(auth);
-      throw new Error("Invalid account. Phone missing.");
-    }
-
-    await attachWebSession(credential.user.uid);
-    await refreshUser();
-  } catch (error: any) {
-    const found = await findUserByPhone(normalizedPhone);
-
-    if (found?.data?.email && !isInternalGeneratedEmail(found.data.email)) {
-      const fallbackCredential = await signInWithEmailAndPassword(
-        auth,
-        found.data.email,
-        password
-      );
-
-      const syncedUser = await createOrSyncUserDoc(fallbackCredential.user);
+    try {
+      const credential = await signInWithEmailAndPassword(auth, internalEmail, password);
+      const syncedUser = await createOrSyncUserDoc(credential.user);
 
       if (!syncedUser) {
         await signOut(auth);
         throw new Error("Account not found. Register first.");
       }
 
-      await attachWebSession(fallbackCredential.user.uid);
+      if (!syncedUser.phone) {
+        await signOut(auth);
+        throw new Error("Invalid account. Phone missing.");
+      }
+
+      await attachWebSession(credential.user.uid);
       await refreshUser();
-      return;
-    }
+    } catch (error: any) {
+      const found = await findUserByPhone(normalizedPhone);
 
-    throw error;
-  }
-}
+      if (found?.data?.email && !isInternalGeneratedEmail(found.data.email)) {
+        const fallbackCredential = await signInWithEmailAndPassword(
+          auth,
+          found.data.email,
+          password
+        );
 
-async function loginAdminWithEmail(email: string, password: string) {
-  const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
+        const syncedUser = await createOrSyncUserDoc(fallbackCredential.user);
 
-  const userRef = doc(db, "users", credential.user.uid);
-  const userSnap = await getDoc(userRef);
+        if (!syncedUser) {
+          await signOut(auth);
+          throw new Error("Account not found. Register first.");
+        }
 
-  if (!userSnap.exists()) {
-    await signOut(auth);
-    throw new Error("Admin account not configured.");
-  }
-
-  const data = userSnap.data() as Partial<AppUser>;
-  const allowed = data.isAdmin === true || data.role === "admin";
-
-  if (!allowed) {
-    await signOut(auth);
-    throw new Error("You are not authorized as admin.");
-  }
-
-  if (data.isActive === false) {
-    await signOut(auth);
-    throw new Error("Your admin account is inactive.");
-  }
-
-  await attachWebSession(credential.user.uid);
-  await refreshUser();
-}
-
-async function setupPhoneRecaptcha(containerId = "recaptcha-container"): Promise<RecaptchaVerifier> {
-  const container = document.getElementById(containerId);
-
-  if (!container) {
-    throw new Error("reCAPTCHA container not found.");
-  }
-
-  const sameContainer =
-    window.recaptchaVerifier &&
-    window.recaptchaContainerId === containerId;
-
-  if (sameContainer) {
-    try {
-      if (
-        typeof window.recaptchaWidgetId === "number" &&
-        window.grecaptcha &&
-        typeof window.grecaptcha.reset === "function"
-      ) {
-        window.grecaptcha.reset(window.recaptchaWidgetId);
+        await attachWebSession(fallbackCredential.user.uid);
+        await refreshUser();
+        return;
       }
-    } catch (error) {
-      console.warn("reCAPTCHA reset warning:", error);
-    }
 
-    return window.recaptchaVerifier!;
-  }
-
-  try {
-    if (window.recaptchaVerifier) {
-      window.recaptchaVerifier.clear();
-    }
-  } catch (error) {
-    console.warn("Failed to clear previous reCAPTCHA:", error);
-  }
-
-  container.innerHTML = "";
-
-  const inner = document.createElement("div");
-  inner.id = `${containerId}-inner`;
-  container.appendChild(inner);
-
-  const verifier = new RecaptchaVerifier(auth, inner, {
-    size: "invisible",
-  });
-
-  const widgetId = await verifier.render();
-
-  window.recaptchaVerifier = verifier;
-  window.recaptchaWidgetId = widgetId;
-  window.recaptchaContainerId = containerId;
-
-  return verifier;
-}
-
-async function sendOtpInternal(
-  phone: string,
-  purpose: "login" | "signup" | "reset-password",
-  containerId = "recaptcha-container"
-): Promise<ConfirmationResult> {
-  const normalizedPhone = normalizePhone(phone);
-
-  if (!normalizedPhone) {
-    throw new Error("Enter a valid mobile number.");
-  }
-
-  if (purpose === "login") {
-    const found = await findUserByPhone(normalizedPhone);
-    if (!found?.data) {
-      throw new Error("Account not found. Register first.");
-    }
-    if (found.data.isActive === false) {
-      throw new Error("Your account is inactive. Please contact admin.");
+      throw error;
     }
   }
 
-  if (purpose === "signup") {
-    const found = await findUserByPhone(normalizedPhone);
-    if (found?.data) {
-      throw new Error("This mobile number is already registered.");
-    }
-  }
+  async function loginAdminWithEmail(email: string, password: string) {
+    const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
 
-  if (purpose === "reset-password") {
-    const found = await findUserByPhone(normalizedPhone);
-    if (!found?.data) {
-      throw new Error("No account found with this linked mobile number.");
-    }
-    if (found.data.isActive === false) {
-      throw new Error("Your account is inactive. Please contact admin.");
-    }
-  }
+    const userRef = doc(db, "users", credential.user.uid);
+    const userSnap = await getDoc(userRef);
 
-  const verifier = await setupPhoneRecaptcha(containerId);
-
-  try {
-    if (
-      typeof window.recaptchaWidgetId === "number" &&
-      window.grecaptcha &&
-      typeof window.grecaptcha.reset === "function"
-    ) {
-      window.grecaptcha.reset(window.recaptchaWidgetId);
+    if (!userSnap.exists()) {
+      await signOut(auth);
+      throw new Error("Admin account not configured.");
     }
 
-    const confirmation = await signInWithPhoneNumber(auth, normalizedPhone, verifier);
-    return confirmation;
-  } catch (error: any) {
-    try {
-      if (
-        typeof window.recaptchaWidgetId === "number" &&
-        window.grecaptcha &&
-        typeof window.grecaptcha.reset === "function"
-      ) {
-        window.grecaptcha.reset(window.recaptchaWidgetId);
-      }
-    } catch (resetError) {
-      console.warn("Failed to reset reCAPTCHA after OTP error:", resetError);
+    const data = userSnap.data() as Partial<AppUser>;
+    const allowed = data.isAdmin === true || data.role === "admin";
+
+    if (!allowed) {
+      await signOut(auth);
+      throw new Error("You are not authorized as admin.");
     }
 
-    if (error?.code === "auth/invalid-phone-number") {
-      throw new Error("Invalid mobile number.");
+    if (data.isActive === false) {
+      await signOut(auth);
+      throw new Error("Your admin account is inactive.");
     }
 
-    if (error?.code === "auth/too-many-requests") {
-      throw new Error("Too many OTP requests. Please wait and try again.");
-    }
-
-    if (error?.code === "auth/quota-exceeded") {
-      throw new Error("OTP quota exceeded. Please try again later.");
-    }
-
-    throw error;
-  }
-}
-
-async function sendPhoneOtp(phone: string, containerId = "recaptcha-container") {
-  return await sendOtpInternal(phone, "login", containerId);
-}
-
-async function verifyPhoneOtp(confirmation: ConfirmationResult, otp: string) {
-  const cleanOtp = otp.trim();
-
-  if (!cleanOtp || cleanOtp.length !== 6) {
-    throw new Error("Enter a valid 6-digit OTP.");
-  }
-
-  try {
-    await confirmation.confirm(cleanOtp);
+    await attachWebSession(credential.user.uid);
     await refreshUser();
-  } catch (error: any) {
-    if (error?.code === "auth/invalid-verification-code") {
-      throw new Error("Invalid OTP. Please try again.");
-    }
-
-    if (error?.code === "auth/code-expired") {
-      throw new Error("OTP expired. Please request a new OTP.");
-    }
-
-    if (error?.code === "auth/session-expired") {
-      throw new Error("OTP session expired. Please request a new OTP.");
-    }
-
-    throw error;
-  }
-}
-
-async function startStudentSignup(
-  fullName: string,
-  phone: string,
-  password: string,
-  email?: string,
-  containerId = "recaptcha-container"
-) {
-  const normalizedPhone = normalizePhone(phone);
-
-  pendingSignupRef.current = {
-    fullName: fullName.trim(),
-    phone: normalizedPhone,
-    password,
-    email: email?.trim().toLowerCase() || "",
-  };
-
-  try {
-    return await sendOtpInternal(normalizedPhone, "signup", containerId);
-  } catch (error) {
-    pendingSignupRef.current = null;
-    throw error;
-  }
-}
-
-async function completeStudentSignup(
-  confirmation: ConfirmationResult,
-  otp: string
-) {
-  if (!pendingSignupRef.current) {
-    throw new Error("Signup session expired. Please try again.");
   }
 
-  const { fullName, phone, password, email } = pendingSignupRef.current;
+  async function setupPhoneRecaptcha(
+    containerId = "recaptcha-container"
+  ): Promise<RecaptchaVerifier> {
+    const container = document.getElementById(containerId);
 
-  const authEmail = getInternalEmailFromPhone(phone);
-  const optionalEmail = email?.trim().toLowerCase() || "";
+    if (!container) {
+      throw new Error("reCAPTCHA container not found.");
+    }
 
-  let resultUser: FirebaseUser | null = null;
+    const existingInner = document.getElementById(`${containerId}-inner`);
 
-  try {
+    const staleVerifier =
+      !!window.recaptchaVerifier &&
+      (
+        window.recaptchaContainerId !== containerId ||
+        !existingInner ||
+        !document.body.contains(container)
+      );
+
+    if (staleVerifier) {
+      try {
+        window.recaptchaVerifier?.clear();
+      } catch (e) { }
+
+      window.recaptchaVerifier = undefined;
+      window.recaptchaWidgetId = undefined;
+      window.recaptchaContainerId = undefined;
+    }
+
+    const sameContainer =
+      !!window.recaptchaVerifier &&
+      window.recaptchaContainerId === containerId &&
+      !!existingInner &&
+      document.body.contains(existingInner);
+
+    if (sameContainer) {
+      try {
+        if (
+          typeof window.recaptchaWidgetId === "number" &&
+          window.grecaptcha &&
+          typeof window.grecaptcha.reset === "function"
+        ) {
+          window.grecaptcha.reset(window.recaptchaWidgetId);
+        }
+      } catch { }
+
+      return window.recaptchaVerifier!;
+    }
+
+    try {
+      window.recaptchaVerifier?.clear();
+    } catch { }
+
+    window.recaptchaVerifier = undefined;
+    window.recaptchaWidgetId = undefined;
+    window.recaptchaContainerId = undefined;
+
+    container.innerHTML = "";
+
+    const inner = document.createElement("div");
+    inner.id = `${containerId}-inner`;
+    container.appendChild(inner);
+
+    const verifier = new RecaptchaVerifier(auth, inner, {
+      size: "invisible",
+    });
+
+    const widgetId = await verifier.render();
+
+    window.recaptchaVerifier = verifier;
+    window.recaptchaWidgetId = widgetId;
+    window.recaptchaContainerId = containerId;
+
+    return verifier;
+  }
+
+  async function sendOtpInternal(
+    phone: string,
+    purpose: "login" | "signup" | "reset-password",
+    containerId = "recaptcha-container"
+  ): Promise<ConfirmationResult> {
+    const normalizedPhone = normalizePhone(phone);
+
+    if (!normalizedPhone) {
+      throw new Error("Enter a valid mobile number.");
+    }
+
+    // 🔒 Validation logic (UNCHANGED)
+    if (purpose === "login") {
+      const found = await findUserByPhone(normalizedPhone);
+      if (!found?.data) {
+        throw new Error("Account not found. Register first.");
+      }
+      if (found.data.isActive === false) {
+        throw new Error("Your account is inactive. Please contact admin.");
+      }
+    }
+
+    if (purpose === "signup") {
+      const found = await findUserByPhone(normalizedPhone);
+      if (found?.data) {
+        throw new Error("This mobile number is already registered.");
+      }
+    }
+
+    if (purpose === "reset-password") {
+      const found = await findUserByPhone(normalizedPhone);
+      if (!found?.data) {
+        throw new Error("No account found with this linked mobile number.");
+      }
+      if (found.data.isActive === false) {
+        throw new Error("Your account is inactive. Please contact admin.");
+      }
+    }
+
+    let verifier: RecaptchaVerifier;
+
+    // 🔁 Always ensure fresh verifier
+    try {
+      verifier = await setupPhoneRecaptcha(containerId);
+    } catch {
+      try {
+        window.recaptchaVerifier?.clear();
+      } catch { }
+
+      window.recaptchaVerifier = undefined;
+      window.recaptchaWidgetId = undefined;
+      window.recaptchaContainerId = undefined;
+
+      verifier = await setupPhoneRecaptcha(containerId);
+    }
+
+    try {
+      // 🔄 Reset widget before sending OTP
+      if (
+        typeof window.recaptchaWidgetId === "number" &&
+        window.grecaptcha &&
+        typeof window.grecaptcha.reset === "function"
+      ) {
+        window.grecaptcha.reset(window.recaptchaWidgetId);
+      }
+
+      const confirmation = await signInWithPhoneNumber(
+        auth,
+        normalizedPhone,
+        verifier
+      );
+
+      return confirmation;
+    } catch (error: any) {
+      // ❗ Clear broken verifier completely
+      try {
+        window.recaptchaVerifier?.clear();
+      } catch { }
+
+      window.recaptchaVerifier = undefined;
+      window.recaptchaWidgetId = undefined;
+      window.recaptchaContainerId = undefined;
+
+      // 🔥 Handle recaptcha-specific errors
+      if (
+        String(error?.message || "").toLowerCase().includes("recaptcha") ||
+        String(error?.message || "").toLowerCase().includes("removed")
+      ) {
+        throw new Error("Verification expired. Please try again.");
+      }
+
+      if (error?.code === "auth/invalid-phone-number") {
+        throw new Error("Invalid mobile number.");
+      }
+
+      if (error?.code === "auth/too-many-requests") {
+        throw new Error("Too many OTP requests. Please wait and try again.");
+      }
+
+      if (error?.code === "auth/quota-exceeded") {
+        throw new Error("OTP quota exceeded. Please try again later.");
+      }
+
+      throw error;
+    }
+  }
+
+  async function sendPhoneOtp(phone: string, containerId = "recaptcha-container") {
+    return await sendOtpInternal(phone, "login", containerId);
+  }
+
+  async function verifyPhoneOtp(confirmation: ConfirmationResult, otp: string) {
     const cleanOtp = otp.trim();
 
     if (!cleanOtp || cleanOtp.length !== 6) {
       throw new Error("Enter a valid 6-digit OTP.");
     }
 
-    const result = await confirmation.confirm(cleanOtp);
-    resultUser = result.user;
-
-    const existingUserDoc = await getDoc(doc(db, "users", resultUser.uid));
-    if (existingUserDoc.exists()) {
-      throw new Error("This mobile number is already registered.");
-    }
-
-    const credential = EmailAuthProvider.credential(authEmail, password);
-    await linkWithCredential(resultUser, credential);
-
-    await updateProfile(resultUser, {
-      displayName: fullName,
-    });
-
-    const userRef = doc(db, "users", resultUser.uid);
-
-    const newUser = {
-      uid: resultUser.uid,
-      fullName,
-      email: optionalEmail,
-      phone,
-      role: "student" as const,
-      isAdmin: false,
-      isActive: true,
-      profilePicture: "",
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-      lastLoginAt: serverTimestamp(),
-      activeWebSessionId: "",
-      lastWebLoginAt: null,
-      lastPlatform: "web",
-    };
-
-    await setDoc(userRef, newUser);
-    await attachWebSession(resultUser.uid);
-    await refreshUser();
-
-    pendingSignupRef.current = null;
-  } catch (error: any) {
-    console.error("Student signup completion error:", error);
-
-    if (resultUser) {
-      try {
-        await deleteUser(resultUser);
-      } catch (cleanupError) {
-        console.error("Failed to cleanup partial signup user:", cleanupError);
+    try {
+      await confirmation.confirm(cleanOtp);
+      await refreshUser();
+    } catch (error: any) {
+      if (error?.code === "auth/invalid-verification-code") {
+        throw new Error("Invalid OTP. Please try again.");
       }
+
+      if (error?.code === "auth/code-expired") {
+        throw new Error("OTP expired. Please request a new OTP.");
+      }
+
+      if (error?.code === "auth/session-expired") {
+        throw new Error("OTP session expired. Please request a new OTP.");
+      }
+
+      throw error;
     }
-
-    pendingSignupRef.current = null;
-
-    if (error?.code === "auth/credential-already-in-use") {
-      throw new Error("This account is already linked.");
-    }
-
-    if (error?.code === "auth/email-already-in-use") {
-      throw new Error("This account already exists.");
-    }
-
-    if (error?.code === "auth/invalid-verification-code") {
-      throw new Error("Invalid OTP. Please try again.");
-    }
-
-    if (error?.code === "auth/code-expired") {
-      throw new Error("OTP expired. Please request a new OTP.");
-    }
-
-    if (error?.code === "auth/session-expired") {
-      throw new Error("OTP session expired. Please request a new OTP.");
-    }
-
-    if (error?.code === "auth/provider-already-linked") {
-      throw new Error("This phone number is already registered.");
-    }
-
-    throw error;
-  }
-}
-
-async function startForgotPasswordOtp(
-  identifier: string,
-  containerId = "recaptcha-container"
-) {
-  const found = await findUserByIdentifier(identifier);
-
-  if (!found?.data) {
-    throw new Error("Account not found. Please check your mobile number or email.");
   }
 
-  if (found.data.isActive === false) {
-    throw new Error("Your account is inactive. Please contact admin.");
-  }
+  async function startStudentSignup(
+    fullName: string,
+    phone: string,
+    password: string,
+    email?: string,
+    containerId = "recaptcha-container"
+  ) {
+    const normalizedPhone = normalizePhone(phone);
 
-  const linkedPhone = normalizePhone(found.data.phone || "");
-
-  if (!linkedPhone) {
-    throw new Error("No linked phone number found for this account.");
-  }
-
-  pendingPasswordResetRef.current = {
-    uid: found.id,
-    phone: linkedPhone,
-    email: found.data.email || "",
-  };
-
-  try {
-    const confirmation = await sendOtpInternal(
-      linkedPhone,
-      "reset-password",
-      containerId
-    );
-
-    return {
-      confirmation,
-      maskedPhone: maskPhone(linkedPhone),
+    pendingSignupRef.current = {
+      fullName: fullName.trim(),
+      phone: normalizedPhone,
+      password,
+      email: email?.trim().toLowerCase() || "",
     };
-  } catch (error) {
-    pendingPasswordResetRef.current = null;
-    throw error;
-  }
-}
 
-async function completeForgotPasswordOtp(
-  confirmation: ConfirmationResult,
-  otp: string,
-  _newPassword: string
-) {
-  if (!pendingPasswordResetRef.current) {
-    throw new Error("Password reset session expired. Please request OTP again.");
+    try {
+      return await sendOtpInternal(normalizedPhone, "signup", containerId);
+    } catch (error) {
+      pendingSignupRef.current = null;
+      throw error;
+    }
   }
 
-  const cleanOtp = otp.trim();
-
-  if (!cleanOtp || cleanOtp.length !== 6) {
-    throw new Error("Enter a valid 6-digit OTP.");
-  }
-
-  try {
-    const result = await confirmation.confirm(cleanOtp);
-
-    const verifiedPhone = normalizePhone(result.user.phoneNumber || "");
-    const expectedPhone = normalizePhone(pendingPasswordResetRef.current.phone);
-    const correctUid = pendingPasswordResetRef.current.uid;
-
-    if (verifiedPhone !== expectedPhone) {
-      throw new Error("OTP verified for a different phone number.");
+  async function completeStudentSignup(
+    confirmation: ConfirmationResult,
+    otp: string
+  ) {
+    if (!pendingSignupRef.current) {
+      throw new Error("Signup session expired. Please try again.");
     }
 
-    const correctUserRef = doc(db, "users", correctUid);
-    const correctUserSnap = await getDoc(correctUserRef);
+    const { fullName, phone, password, email } = pendingSignupRef.current;
 
-    if (!correctUserSnap.exists()) {
-      throw new Error("Account not found for password reset.");
+    const authEmail = getInternalEmailFromPhone(phone);
+    const optionalEmail = email?.trim().toLowerCase() || "";
+
+    let resultUser: FirebaseUser | null = null;
+
+    try {
+      const cleanOtp = otp.trim();
+
+      if (!cleanOtp || cleanOtp.length !== 6) {
+        throw new Error("Enter a valid 6-digit OTP.");
+      }
+
+      const result = await confirmation.confirm(cleanOtp);
+      resultUser = result.user;
+
+      const existingUserDoc = await getDoc(doc(db, "users", resultUser.uid));
+      if (existingUserDoc.exists()) {
+        throw new Error("This mobile number is already registered.");
+      }
+
+      const credential = EmailAuthProvider.credential(authEmail, password);
+      await linkWithCredential(resultUser, credential);
+
+      await updateProfile(resultUser, {
+        displayName: fullName,
+      });
+
+      const userRef = doc(db, "users", resultUser.uid);
+
+      const newUser = {
+        uid: resultUser.uid,
+        fullName,
+        email: optionalEmail,
+        phone,
+        role: "student" as const,
+        isAdmin: false,
+        isActive: true,
+        profilePicture: "",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        lastLoginAt: serverTimestamp(),
+        activeWebSessionId: "",
+        lastWebLoginAt: null,
+        lastPlatform: "web",
+      };
+
+      await setDoc(userRef, newUser);
+      await attachWebSession(resultUser.uid);
+      await refreshUser();
+
+      pendingSignupRef.current = null;
+    } catch (error: any) {
+      console.error("Student signup completion error:", error);
+
+      if (resultUser) {
+        try {
+          await deleteUser(resultUser);
+        } catch (cleanupError) {
+          console.error("Failed to cleanup partial signup user:", cleanupError);
+        }
+      }
+
+      pendingSignupRef.current = null;
+
+      if (error?.code === "auth/credential-already-in-use") {
+        throw new Error("This account is already linked.");
+      }
+
+      if (error?.code === "auth/email-already-in-use") {
+        throw new Error("This account already exists.");
+      }
+
+      if (error?.code === "auth/invalid-verification-code") {
+        throw new Error("Invalid OTP. Please try again.");
+      }
+
+      if (error?.code === "auth/code-expired") {
+        throw new Error("OTP expired. Please request a new OTP.");
+      }
+
+      if (error?.code === "auth/session-expired") {
+        throw new Error("OTP session expired. Please request a new OTP.");
+      }
+
+      if (error?.code === "auth/provider-already-linked") {
+        throw new Error("This phone number is already registered.");
+      }
+
+      throw error;
+    }
+  }
+
+  async function startForgotPasswordOtp(
+    identifier: string,
+    containerId = "recaptcha-container"
+  ) {
+    const found = await findUserByIdentifier(identifier);
+
+    if (!found?.data) {
+      throw new Error("Account not found. Please check your mobile number or email.");
     }
 
-    const correctUserData = correctUserSnap.data() as Partial<AppUser>;
-
-    if (correctUserData.isActive === false) {
+    if (found.data.isActive === false) {
       throw new Error("Your account is inactive. Please contact admin.");
     }
 
-    const resolvedUser: AppUser = {
-      uid: correctUid,
-      fullName: correctUserData.fullName || result.user.displayName || "Student",
-      email:
-        correctUserData.email && !isInternalGeneratedEmail(correctUserData.email)
-          ? normalizeEmail(correctUserData.email)
-          : "",
-      phone: normalizePhone(correctUserData.phone || expectedPhone),
-      role: correctUserData.role === "admin" ? "admin" : "student",
-      isAdmin: correctUserData.isAdmin ?? correctUserData.role === "admin",
-      isActive: correctUserData.isActive ?? true,
-      semester: correctUserData.semester,
-      profilePicture: correctUserData.profilePicture || "",
-      createdAt: correctUserData.createdAt,
-      updatedAt: correctUserData.updatedAt,
-      lastLoginAt: correctUserData.lastLoginAt,
-      activeWebSessionId: correctUserData.activeWebSessionId || "",
-      lastWebLoginAt: correctUserData.lastWebLoginAt,
-      lastPlatform: correctUserData.lastPlatform || "web",
+    const linkedPhone = normalizePhone(found.data.phone || "");
+
+    if (!linkedPhone) {
+      throw new Error("No linked phone number found for this account.");
+    }
+
+    pendingPasswordResetRef.current = {
+      uid: found.id,
+      phone: linkedPhone,
+      email: found.data.email || "",
     };
 
-    // Keep the OTP Firebase session alive for now,
-    // but switch the app-level user context to the real CUPHY account.
-    setFirebaseUser(result.user);
-    setUser(resolvedUser);
-    setMustSetPasswordFlag(true);
+    try {
+      const confirmation = await sendOtpInternal(
+        linkedPhone,
+        "reset-password",
+        containerId
+      );
 
-    pendingPasswordResetRef.current = null;
-  } catch (error: any) {
-    if (error?.code === "auth/invalid-verification-code") {
-      throw new Error("Invalid OTP. Please try again.");
+      return {
+        confirmation,
+        maskedPhone: maskPhone(linkedPhone),
+      };
+    } catch (error) {
+      pendingPasswordResetRef.current = null;
+      throw error;
     }
-
-    if (error?.code === "auth/code-expired") {
-      throw new Error("OTP expired. Please request a new OTP.");
-    }
-
-    if (error?.code === "auth/session-expired") {
-      throw new Error("OTP session expired. Please request a new OTP.");
-    }
-
-    throw error;
-  }
-}
-
-async function forgotPassword(email: string) {
-  await sendPasswordResetEmail(auth, email.trim());
-}
-
-async function forgotPasswordByPhone(phone: string) {
-  const found = await findUserByPhone(phone);
-
-  if (!found?.data) {
-    throw new Error("No account found with this mobile number.");
   }
 
-  const accountEmail = found.data.email || "";
+  async function completeForgotPasswordOtp(
+    confirmation: ConfirmationResult,
+    otp: string,
+    _newPassword: string
+  ) {
+    if (!pendingPasswordResetRef.current) {
+      throw new Error("Password reset session expired. Please request OTP again.");
+    }
 
-  if (!accountEmail || isInternalGeneratedEmail(accountEmail)) {
-    throw new Error(
-      "No linked personal email found for this mobile number. Please contact admin or update your email in profile first."
-    );
+    const cleanOtp = otp.trim();
+
+    if (!cleanOtp || cleanOtp.length !== 6) {
+      throw new Error("Enter a valid 6-digit OTP.");
+    }
+
+    try {
+      const result = await confirmation.confirm(cleanOtp);
+
+      const verifiedPhone = normalizePhone(result.user.phoneNumber || "");
+      const expectedPhone = normalizePhone(pendingPasswordResetRef.current.phone);
+      const correctUid = pendingPasswordResetRef.current.uid;
+
+      if (verifiedPhone !== expectedPhone) {
+        throw new Error("OTP verified for a different phone number.");
+      }
+
+      const correctUserRef = doc(db, "users", correctUid);
+      const correctUserSnap = await getDoc(correctUserRef);
+
+      if (!correctUserSnap.exists()) {
+        throw new Error("Account not found for password reset.");
+      }
+
+      const correctUserData = correctUserSnap.data() as Partial<AppUser>;
+
+      if (correctUserData.isActive === false) {
+        throw new Error("Your account is inactive. Please contact admin.");
+      }
+
+      const resolvedUser: AppUser = {
+        uid: correctUid,
+        fullName: correctUserData.fullName || result.user.displayName || "Student",
+        email:
+          correctUserData.email && !isInternalGeneratedEmail(correctUserData.email)
+            ? normalizeEmail(correctUserData.email)
+            : "",
+        phone: normalizePhone(correctUserData.phone || expectedPhone),
+        role: correctUserData.role === "admin" ? "admin" : "student",
+        isAdmin: correctUserData.isAdmin ?? correctUserData.role === "admin",
+        isActive: correctUserData.isActive ?? true,
+        semester: correctUserData.semester,
+        profilePicture: correctUserData.profilePicture || "",
+        createdAt: correctUserData.createdAt,
+        updatedAt: correctUserData.updatedAt,
+        lastLoginAt: correctUserData.lastLoginAt,
+        activeWebSessionId: correctUserData.activeWebSessionId || "",
+        lastWebLoginAt: correctUserData.lastWebLoginAt,
+        lastPlatform: correctUserData.lastPlatform || "web",
+      };
+
+      // Keep the OTP Firebase session alive for now,
+      // but switch the app-level user context to the real CUPHY account.
+      setFirebaseUser(result.user);
+      setUser(resolvedUser);
+      setMustSetPasswordFlag(true);
+
+      pendingPasswordResetRef.current = null;
+    } catch (error: any) {
+      if (error?.code === "auth/invalid-verification-code") {
+        throw new Error("Invalid OTP. Please try again.");
+      }
+
+      if (error?.code === "auth/code-expired") {
+        throw new Error("OTP expired. Please request a new OTP.");
+      }
+
+      if (error?.code === "auth/session-expired") {
+        throw new Error("OTP session expired. Please request a new OTP.");
+      }
+
+      throw error;
+    }
   }
 
-  await sendPasswordResetEmail(auth, accountEmail);
+  async function forgotPassword(email: string) {
+    await sendPasswordResetEmail(auth, email.trim());
+  }
 
-  return {
-    mode: "email" as const,
-    email: accountEmail,
-  };
-}
+  async function forgotPasswordByPhone(phone: string) {
+    const found = await findUserByPhone(phone);
 
-async function logout() {
-  try {
-    if (auth.currentUser?.uid) {
-      const currentUid = auth.currentUser.uid;
-      const currentLocalSession = getLocalWebSessionId();
+    if (!found?.data) {
+      throw new Error("No account found with this mobile number.");
+    }
 
-      const userRef = doc(db, "users", currentUid);
-      const snap = await getDoc(userRef);
+    const accountEmail = found.data.email || "";
 
-      if (snap.exists()) {
-        const data = snap.data() as Partial<AppUser>;
-        if (data.activeWebSessionId && data.activeWebSessionId === currentLocalSession) {
-          await updateDoc(userRef, {
-            activeWebSessionId: "",
-            updatedAt: serverTimestamp(),
-          });
+    if (!accountEmail || isInternalGeneratedEmail(accountEmail)) {
+      throw new Error(
+        "No linked personal email found for this mobile number. Please contact admin or update your email in profile first."
+      );
+    }
+
+    await sendPasswordResetEmail(auth, accountEmail);
+
+    return {
+      mode: "email" as const,
+      email: accountEmail,
+    };
+  }
+
+  async function logout() {
+    try {
+      if (auth.currentUser?.uid) {
+        const currentUid = auth.currentUser.uid;
+        const currentLocalSession = getLocalWebSessionId();
+
+        const userRef = doc(db, "users", currentUid);
+        const snap = await getDoc(userRef);
+
+        if (snap.exists()) {
+          const data = snap.data() as Partial<AppUser>;
+          if (data.activeWebSessionId && data.activeWebSessionId === currentLocalSession) {
+            await updateDoc(userRef, {
+              activeWebSessionId: "",
+              updatedAt: serverTimestamp(),
+            });
+          }
         }
       }
+
+      await signOut(auth);
+    } catch (error) {
+      console.error("Logout error:", error);
+    } finally {
+      clearLocalWebSessionId();
+      setMustSetPasswordFlag(false);
+      setUser(null);
+      setFirebaseUser(null);
+      queryClient.clear();
+
+      if (userDocUnsubscribeRef.current) {
+        userDocUnsubscribeRef.current();
+        userDocUnsubscribeRef.current = null;
+      }
+
+      if (sessionCheckDelayRef.current) {
+        clearTimeout(sessionCheckDelayRef.current);
+        sessionCheckDelayRef.current = null;
+      }
+
+      sessionReadyRef.current = false;
     }
-
-    await signOut(auth);
-  } catch (error) {
-    console.error("Logout error:", error);
-  } finally {
-    clearLocalWebSessionId();
-    setMustSetPasswordFlag(false);
-    setUser(null);
-    setFirebaseUser(null);
-    queryClient.clear();
-
-    if (userDocUnsubscribeRef.current) {
-      userDocUnsubscribeRef.current();
-      userDocUnsubscribeRef.current = null;
-    }
-
-    if (sessionCheckDelayRef.current) {
-      clearTimeout(sessionCheckDelayRef.current);
-      sessionCheckDelayRef.current = null;
-    }
-
-    sessionReadyRef.current = false;
   }
-}
 
-function updateUser(updatedUser: AppUser) {
-  setUser(updatedUser);
-}
+  function updateUser(updatedUser: AppUser) {
+    setUser(updatedUser);
+  }
 
-return (
-  <AuthContext.Provider
-    value={{
-      user,
-      firebaseUser,
-      isLoading,
-      isAuthenticated: !!user,
-      isAdmin: user?.isAdmin === true || user?.role === "admin",
-      loginWithEmail,
-      loginWithPhone,
-      loginAdminWithEmail,
-      startStudentSignup,
-      completeStudentSignup,
-      forgotPassword,
-      forgotPasswordByPhone,
-      startForgotPasswordOtp,
-      completeForgotPasswordOtp,
-      logout,
-      setupPhoneRecaptcha,
-      sendPhoneOtp,
-      verifyPhoneOtp,
-      refreshUser,
-      updateUser,
-    }}
-  >
-    {children}
-  </AuthContext.Provider>
-);
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        firebaseUser,
+        isLoading,
+        isAuthenticated: !!user,
+        isAdmin: user?.isAdmin === true || user?.role === "admin",
+        loginWithEmail,
+        loginWithPhone,
+        loginAdminWithEmail,
+        startStudentSignup,
+        completeStudentSignup,
+        forgotPassword,
+        forgotPasswordByPhone,
+        startForgotPasswordOtp,
+        completeForgotPasswordOtp,
+        logout,
+        setupPhoneRecaptcha,
+        sendPhoneOtp,
+        verifyPhoneOtp,
+        refreshUser,
+        updateUser,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth() {
