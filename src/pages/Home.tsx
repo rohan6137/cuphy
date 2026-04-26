@@ -12,9 +12,9 @@ import {
   FileText,
   ClipboardList,
   PlayCircle,
-  Users,
   ArrowRight,
   Zap,
+  BookOpenCheck,
   Shield,
   ChevronRight,
 } from "lucide-react";
@@ -142,20 +142,7 @@ export default function Home() {
               </div>
             )}
 
-            <div className="flex flex-wrap gap-6 mt-10 text-sm text-white/60">
-              <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-primary" />
-                <span>500+ Students</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <PlayCircle className="w-4 h-4 text-primary" />
-                <span>200+ Video Lectures</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4 text-primary" />
-                <span>100+ PDF Notes</span>
-              </div>
-            </div>
+
           </div>
         </div>
       </section>
@@ -169,159 +156,124 @@ export default function Home() {
             Comprehensive tools designed for physics students
           </p>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-5">
             {[
               {
                 icon: PlayCircle,
-                label: "Video Lectures",
-                desc: "Structured concept learning",
-                color: "text-purple-500 bg-purple-50 dark:bg-purple-900/20",
-                href: "/batches",
+                label: "Lectures",
+                desc: "HD concept videos",
+                tag: "Watch",
+                bg: "from-blue-500 via-cyan-500 to-teal-400",
+                glow: "bg-blue-300/30",
               },
               {
                 icon: FileText,
-                label: "PDF Notes",
-                desc: "Handwritten & typed notes",
-                color: "text-blue-500 bg-blue-50 dark:bg-blue-900/20",
-                href: "/notes",
+                label: "Notes",
+                desc: "Clean study PDFs",
+                tag: "Study",
+                bg: "from-violet-500 via-purple-500 to-indigo-500",
+                glow: "bg-purple-300/30",
               },
               {
                 icon: ClipboardList,
-                label: "Tests & Quizzes",
-                desc: "MCQ practice tests",
-                color: "text-green-500 bg-green-50 dark:bg-green-900/20",
-                href: "/tests",
+                label: "Tests",
+                desc: "Timed practice",
+                tag: "Practice",
+                bg: "from-emerald-500 via-teal-500 to-cyan-500",
+                glow: "bg-emerald-300/30",
               },
               {
-                icon: Zap,
-                label: "Semester-wise",
-                desc: "Organized by semester",
-                color: "text-orange-500 bg-orange-50 dark:bg-orange-900/20",
-                href: "/batches",
+                icon: BookOpenCheck,
+                label: "PYQ",
+                desc: "Previous year questions",
+                tag: "Revise",
+                bg: "from-orange-500 via-rose-500 to-pink-500",
+                glow: "bg-orange-300/30",
               },
             ].map((f) => (
-              <Link key={f.label} href={f.href}>
-                <Card className="text-center border-border hover:shadow-md hover:-translate-y-1 transition-all duration-300 cursor-pointer">
-                  <CardContent className="p-4 pt-6">
-                    <div
-                      className={`w-12 h-12 rounded-xl ${f.color} flex items-center justify-center mx-auto mb-3`}
-                    >
-                      <f.icon className={`w-6 h-6 ${f.color.split(" ")[0]}`} />
+              <Card
+                key={f.label}
+                className={`relative overflow-hidden border-0 text-white bg-gradient-to-br ${f.bg} shadow-lg rounded-2xl cursor-default min-h-[150px] md:min-h-[170px]`}
+              >
+                <CardContent className="relative z-10 p-4 md:p-5 h-full flex flex-col justify-between">
+                  <div className="flex items-start justify-between">
+                    <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                      <f.icon className="w-5 h-5 text-white" />
                     </div>
-                    <h3 className="font-semibold text-sm mb-1">{f.label}</h3>
-                    <p className="text-xs text-muted-foreground">{f.desc}</p>
-                  </CardContent>
-                </Card>
-              </Link>
+
+                    <span className="text-[10px] md:text-xs font-semibold bg-white/20 px-2 py-1 rounded-full">
+                      {f.tag}
+                    </span>
+                  </div>
+
+                  <div className="mt-7">
+                    <h3 className="font-bold text-sm md:text-base">{f.label}</h3>
+                    <p className="text-[11px] md:text-xs text-white/85 mt-1">
+                      {f.desc}
+                    </p>
+                  </div>
+
+                  <div
+                    className={`absolute -right-6 -bottom-6 w-24 h-24 rounded-full ${f.glow}`}
+                  />
+                  <f.icon className="absolute right-3 bottom-3 w-14 h-14 text-white/15" />
+                </CardContent>
+              </Card>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="py-16 bg-muted/40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h2 className="text-2xl md:text-3xl font-bold font-serif">
-                Available Batches
-              </h2>
-              <p className="text-muted-foreground mt-1">
-                Choose your semester and start learning
-              </p>
-            </div>
-
-            <Link href="/batches">
-              <Button variant="ghost" className="gap-2">
-                View All <ChevronRight className="w-4 h-4" />
-              </Button>
-            </Link>
+      <section className="py-14 bg-muted/30">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="mb-7">
+            <h2 className="text-2xl md:text-3xl font-bold font-serif">
+              Why Students Like CUPHY
+            </h2>
+            <p className="text-muted-foreground mt-1">
+              Made for focused and affordable learning
+            </p>
           </div>
 
-          {batchLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-48 rounded-xl" />
-              ))}
-            </div>
-          ) : batches.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              No batches available right now.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {batches.map((batch: any) => {
-                const batchTitle =
-                  batch.batchName || batch.name || "Unnamed Batch";
+          <div className="space-y-4">
+            {[
+              {
+                icon: Shield,
+                title: "Premium Feel",
+                desc: "Clean UI with focused learning flow",
+              },
+              {
+                icon: BookOpenCheck,
+                title: "Semester-wise",
+                desc: "Content stays organized and easy to follow",
+              },
+              {
+                icon: Zap,
+                title: "Save Time",
+                desc: "Important materials available quickly",
+              },
+            ].map((item) => (
+              <Card
+                key={item.title}
+                className="border-border bg-card/95 shadow-sm rounded-2xl"
+              >
+                <CardContent className="p-4 flex items-center gap-4">
+                  <div className="w-11 h-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                    <item.icon className="w-5 h-5" />
+                  </div>
 
-                return (
-                  <Card
-                    key={batch.id}
-                    className="hover:shadow-lg transition-shadow border-border overflow-hidden"
-                  >
-                    <div className="h-2 bg-gradient-to-r from-primary to-primary/60" />
-
-                    <CardHeader className="pb-2">
-                      <div className="flex items-start justify-between">
-                        <Badge variant="secondary" className="text-xs">
-                          Semester {batch.semester}
-                        </Badge>
-
-                        {batch.originalPrice ? (
-                          <Badge className="bg-green-100 text-green-700 text-xs">
-                            Sale
-                          </Badge>
-                        ) : null}
-                      </div>
-
-                      <h3 className="font-bold text-lg mt-2">{batchTitle}</h3>
-
-                      <p className="text-sm text-muted-foreground line-clamp-2">
-                        {batch.description || "No description available"}
-                      </p>
-                    </CardHeader>
-
-                    <CardContent className="pb-4">
-                      <div className="flex items-center gap-2 mb-4">
-                        <span className="text-2xl font-bold text-primary">
-                          ₹{batch.price || 0}
-                        </span>
-
-                        {batch.originalPrice ? (
-                          <span className="text-sm text-muted-foreground line-through">
-                            ₹{batch.originalPrice}
-                          </span>
-                        ) : null}
-                      </div>
-
-                      <div className="flex gap-2">
-                        <Link href={`/batches/${batch.id}`} className="flex-1">
-                          <Button variant="outline" size="sm" className="w-full">
-                            View Details
-                          </Button>
-                        </Link>
-
-                        {batch.paymentLink ? (
-                          <a
-                            href={batch.paymentLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex-1"
-                          >
-                            <Button
-                              size="sm"
-                              className="w-full bg-primary hover:bg-primary/90"
-                            >
-                              Subscribe
-                            </Button>
-                          </a>
-                        ) : null}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
+                  <div>
+                    <h3 className="font-semibold text-sm md:text-base">
+                      {item.title}
+                    </h3>
+                    <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
+                      {item.desc}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
       </section>
 

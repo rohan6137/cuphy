@@ -27,6 +27,7 @@ const TestResultDetail = lazy(() => import("@/pages/TestResultDetail"));
 const TestTaker = lazy(() => import("@/pages/TestTaker"));
 const Profile = lazy(() => import("@/pages/Profile"));
 const Notifications = lazy(() => import("@/pages/Notifications"));
+const Performance = lazy(() => import("@/pages/Performance"));
 
 const AdminDashboard = lazy(() => import("@/pages/admin/AdminDashboard"));
 const AdminBatches = lazy(() => import("@/pages/admin/AdminBatches"));
@@ -178,6 +179,10 @@ function Router() {
 
       <Route path="/tests/result/:id">
         {() => <ProtectedRoute component={TestResultDetail} />}
+      </Route>
+
+      <Route path="/performance">
+        {() => <ProtectedRoute component={Performance} />}
       </Route>
 
       <Route path="/profile">

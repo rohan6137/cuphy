@@ -29,8 +29,6 @@ import {
   ShieldCheck,
   TrendingUp,
   Star,
-  ChevronsUpDown,
-  Flame,
 } from "lucide-react";
 
 export default function Dashboard() {
@@ -41,7 +39,7 @@ export default function Dashboard() {
   const [results, setResults] = useState<any[]>([]);
   const [batchLoading, setBatchLoading] = useState(true);
   const [dashboardLoading, setDashboardLoading] = useState(true);
-  const [showAllResults, setShowAllResults] = useState(false);
+
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -307,7 +305,7 @@ export default function Dashboard() {
 
   const latestBatch = batches[0];
   const latestResult = results[0];
-  const visibleResults = showAllResults ? results.slice(0, 6) : results.slice(0, 2);
+  const visibleResults = results.slice(0, 3);
 
   const quickLinks = useMemo(
     () => [
@@ -610,17 +608,18 @@ export default function Dashboard() {
                       </p>
                     </div>
 
-                    {results.length > 2 ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="rounded-xl gap-2 border-border/70"
-                        onClick={() => setShowAllResults((prev) => !prev)}
-                      >
-                        {showAllResults ? "Show Less" : "Show More"}
-                        <ChevronsUpDown className="w-4 h-4" />
-                      </Button>
+                    {results.length > 3 ? (
+                      <Link href="/performance">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="rounded-xl gap-2 border-border/70"
+                        >
+                          View Full Performance
+                          <ChevronRight className="w-4 h-4" />
+                        </Button>
+                      </Link>
                     ) : null}
                   </div>
 
@@ -724,43 +723,6 @@ export default function Dashboard() {
                       <p className="text-xs text-muted-foreground mb-1">Premium Expired</p>
                       <p className="font-semibold text-sm">{expiredPremiumCount}</p>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="rounded-[28px] border shadow-sm overflow-hidden">
-                <CardContent className="p-0">
-                  <div className="p-5 border-b bg-gradient-to-r from-primary/10 to-transparent">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Flame className="w-4 h-4 text-primary" />
-                      <h2 className="text-lg md:text-xl font-bold">Study Actions</h2>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      Fast access to your main student tools
-                    </p>
-                  </div>
-
-                  <div className="p-4 space-y-3">
-                    {quickLinks.map((l) => (
-                      <Link key={l.href} href={l.href}>
-                        <button className="w-full rounded-2xl border bg-card hover:bg-muted/40 transition-all duration-200 px-4 py-4 text-left group shadow-sm">
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-3 min-w-0">
-                              <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                                <l.icon className="w-4 h-4" />
-                              </div>
-                              <div className="min-w-0">
-                                <p className="font-semibold text-sm">{l.label}</p>
-                                <p className="text-xs text-muted-foreground mt-0.5">
-                                  {l.sub}
-                                </p>
-                              </div>
-                            </div>
-                            <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition shrink-0" />
-                          </div>
-                        </button>
-                      </Link>
-                    ))}
                   </div>
                 </CardContent>
               </Card>

@@ -30,6 +30,7 @@ import {
   Award,
   Lock,
   PlayCircle,
+  ChevronDown,
 } from "lucide-react";
 
 export default function Tests() {
@@ -41,6 +42,7 @@ export default function Tests() {
   const [results, setResults] = useState<any[]>([]);
   const [activeBatchIds, setActiveBatchIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showPerformance, setShowPerformance] = useState(false);
 
   useEffect(() => {
     const loadTests = async () => {
@@ -424,8 +426,8 @@ export default function Tests() {
                   <CardContent className="p-5 flex flex-col md:flex-row md:items-center gap-4">
                     <div
                       className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${isPremiumTest
-                          ? "bg-orange-100 dark:bg-orange-900/30"
-                          : "bg-blue-100 dark:bg-blue-900/30"
+                        ? "bg-orange-100 dark:bg-orange-900/30"
+                        : "bg-blue-100 dark:bg-blue-900/30"
                         }`}
                     >
                       {isPremiumTest ? (
@@ -488,8 +490,8 @@ export default function Tests() {
                           </p>
                           <p
                             className={`text-xs ${Number(myResult.percentage || 0) >= 60
-                                ? "text-green-600"
-                                : "text-orange-600"
+                              ? "text-green-600"
+                              : "text-orange-600"
                               }`}
                           >
                             {Number(myResult.percentage || 0).toFixed(1)}%
@@ -507,60 +509,24 @@ export default function Tests() {
         )}
 
         <div className="mt-10">
-          <h2 className="text-2xl font-bold mb-4">My Performance</h2>
-
-          {results.length === 0 ? (
-            <Card className="border-border border-dashed rounded-2xl">
-              <CardContent className="p-8 text-center">
-                <Award className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
-                <p className="text-sm text-muted-foreground">
-                  No test history yet
+          <Card className="border-border rounded-2xl overflow-hidden">
+            <CardContent className="p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h2 className="text-xl md:text-2xl font-bold">My Performance</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {results.length === 0
+                    ? "No test history yet"
+                    : `${results.length} result${results.length !== 1 ? "s" : ""} available`}
                 </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-3">
-              {results.slice(0, 8).map((r: any) => (
-                <Link key={r.id} href={`/tests/result/${r.id}`}>
-                  <Card className="border-border rounded-2xl cursor-pointer hover:shadow-md transition">
-                    <CardContent className="p-5 flex items-center gap-4">
-                      <Award
-                        className={`w-5 h-5 shrink-0 ${Number(r.percentage || 0) >= 60
-                            ? "text-green-500"
-                            : "text-orange-500"
-                          }`}
-                      />
+              </div>
 
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">
-                          {r.testTitle || "Untitled Test"}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {r.createdAt?.toDate
-                            ? r.createdAt.toDate().toLocaleDateString("en-IN")
-                            : "Recently"}
-                        </p>
-                      </div>
-
-                      <div className="text-right shrink-0">
-                        <p className="font-bold text-sm">
-                          {r.score}/{r.totalMarks}
-                        </p>
-                        <p
-                          className={`text-xs ${Number(r.percentage || 0) >= 60
-                              ? "text-green-600"
-                              : "text-orange-600"
-                            }`}
-                        >
-                          {Number(r.percentage || 0).toFixed(1)}%
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))}
-            </div>
-          )}
+              <Link href="/performance">
+                <Button className="rounded-2xl">
+                  View Full Performance
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </Layout>
