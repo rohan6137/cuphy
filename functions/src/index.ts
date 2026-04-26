@@ -1,3 +1,4 @@
+import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { onRequest } from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import * as admin from "firebase-admin";
@@ -266,5 +267,72 @@ export const resetUserPassword = onRequest(
         });
       }
     });
+  }
+);
+
+export const sendNotificationOnCreate = onDocumentCreated(
+  {
+    document: "notifications/{notificationId}",
+    region: "asia-south1",
+  },
+  async (event) => {
+    try {
+      const snap = event.data;
+      if (!snap) return;
+
+      const data = snap.data();
+
+      if (!data || data.isActive !== true) return;
+
+      const title = data.title || "CUPHY";
+      const message = data.message || "";
+      const routeType = data.routeType || "";
+      const entityId = data.entityId || "";
+
+      // 🔥 GET ALL USERS
+      const usersSnap = await db.collection("users").get();
+
+      const tokenSet = new Set<string>();
+
+      usersSnap.forEach((doc) => {
+        const user = doc.data();
+
+        if (user.lastFcmToken) {
+          tokenSet.add(String(user.lastFcmToken));
+        }
+
+        if (Array.isArray(user.fcmTokens)) {
+          user.fcmTokens.forEach((token: string) => {
+            if (token) tokenSet.add(String(token));
+          });
+        }
+      });
+      const tokens = Array.from(tokenSet);
+
+      if (tokens.length === 0) {
+        logger.log("No tokens found");
+        return;
+      }
+
+      // 🔥 SEND NOTIFICATION
+      const response = await admin.messaging().sendEachForMulticast({
+        tokens,
+        notification: {
+          title,
+          body: message,
+        },
+        data: {
+          routeType: String(routeType),
+          entityId: String(entityId),
+        },
+      });
+
+      logger.log("Notification sent", {
+        successCount: response.successCount,
+        failureCount: response.failureCount,
+      });
+    } catch (error) {
+      logger.error("sendNotificationOnCreate error", error);
+    }
   }
 );
