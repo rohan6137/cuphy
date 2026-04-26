@@ -911,6 +911,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     containerId = "recaptcha-container"
   ) {
     const normalizedPhone = normalizePhone(phone);
+    const optionalEmail = email?.trim().toLowerCase() || "";
+
+    if (optionalEmail) {
+      const existingEmailUser = await findUserByEmail(optionalEmail);
+
+      if (existingEmailUser?.data) {
+        throw new Error("This email is already linked with another account.");
+      }
+    }
 
     pendingSignupRef.current = {
       fullName: fullName.trim(),
