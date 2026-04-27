@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "264069491637",
+    "project_id": "cuphy-d68ca",
+    "storage_bucket": "cuphy-d68ca.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:264069491637:android:59542da92da2d2e8f087fc",
+        "android_client_info": {
+          "package_name": "com.example.cuphy_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAqvF-8I0u7PHsxxU5hS6aFc5PsdTpoo-Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
