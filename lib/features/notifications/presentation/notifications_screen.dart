@@ -325,7 +325,22 @@ class NotificationsScreen extends StatelessWidget {
                   return const Center(child: CircularProgressIndicator());
                 }
 
-                final docs = snapshot.data?.docs ?? [];
+                final accountCreatedAt = user.metadata.creationTime;
+
+                final allDocs = snapshot.data?.docs ?? [];
+
+                final docs = allDocs.where((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  final createdAt = data['createdAt'];
+
+                  if (accountCreatedAt == null) return true;
+                  if (createdAt is! Timestamp) return false;
+
+                  final notificationTime = createdAt.toDate();
+
+                  return notificationTime.isAfter(accountCreatedAt) ||
+                      notificationTime.isAtSameMomentAs(accountCreatedAt);
+                }).toList();
 
                 if (docs.isEmpty) {
                   return Center(

@@ -17,6 +17,7 @@ class _SplashScreenState extends State<SplashScreen>
   late final Animation<double> _fadeAnimation;
   late final Animation<double> _scaleAnimation;
 
+  Timer? _timer;
   bool _showNextScreen = false;
 
   @override
@@ -40,7 +41,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller.forward();
 
-    Timer(const Duration(milliseconds: 1100), () {
+    _timer = Timer(const Duration(milliseconds: 1100), () {
       if (!mounted) return;
 
       setState(() {
@@ -51,6 +52,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   void dispose() {
+    _timer?.cancel();
     _controller.dispose();
     super.dispose();
   }

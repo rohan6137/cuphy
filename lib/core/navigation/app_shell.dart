@@ -234,11 +234,28 @@ class _HeaderBell extends StatelessWidget {
               .collection('notificationReads')
               .snapshots(),
           builder: (context, readSnap) {
-            final total = notifSnap.data!.docs.length;
-            final readCount = readSnap.data?.docs.length ?? 0;
+            final accountCreatedAt = user.metadata.creationTime;
 
-            int unread = total - readCount;
-            if (unread < 0) unread = 0;
+            final visibleNotifications = notifSnap.data!.docs.where((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              final createdAt = data['createdAt'];
+
+              if (accountCreatedAt == null) return true;
+              if (createdAt is! Timestamp) return false;
+
+              final notificationTime = createdAt.toDate();
+
+              return notificationTime.isAfter(accountCreatedAt) ||
+                  notificationTime.isAtSameMomentAs(accountCreatedAt);
+            }).toList();
+
+            final readIds = (readSnap.data?.docs ?? [])
+                .map((d) => d.id)
+                .toSet();
+
+            final unread = visibleNotifications
+                .where((doc) => !readIds.contains(doc.id))
+                .length;
 
             return _buildBell(unread);
           },

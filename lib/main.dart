@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'features/auth/data/auth_service.dart';
 import 'features/splash/presentation/splash_screen.dart';
-
 import 'core/notifications/push_notification_service.dart';
 import 'core/navigation/app_navigator.dart';
 import 'core/navigation/app_shell.dart';
@@ -15,6 +15,10 @@ import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 👇 KEEP native splash visible
+  await Future.delayed(const Duration(milliseconds: 800));
+
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   await PushNotificationService.init();
@@ -56,6 +60,9 @@ class AuthGate extends StatefulWidget {
 class _AuthGateState extends State<AuthGate> {
   final AuthService _authService = AuthService();
 
+  bool _hasShownStartupSplash = false;
+  bool _forceLogoutInProgress = false;
+
   Stream<DocumentSnapshot<Map<String, dynamic>>> _userDocStream(User user) {
     return FirebaseFirestore.instance
         .collection('users')
@@ -64,9 +71,15 @@ class _AuthGateState extends State<AuthGate> {
   }
 
   Future<void> _forceLogout() async {
+    if (_forceLogoutInProgress) return;
+    _forceLogoutInProgress = true;
+
     await _authService.forceLogoutLocalOnly();
 
     if (!mounted) return;
+
+    _hasShownStartupSplash = false;
+    _forceLogoutInProgress = false;
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -83,6 +96,16 @@ class _AuthGateState extends State<AuthGate> {
     );
   }
 
+  Widget _loggedInApp() {
+    if (!_hasShownStartupSplash) {
+      _hasShownStartupSplash = true;
+
+      return const SplashScreen(nextScreen: AppShell(key: ValueKey('app')));
+    }
+
+    return const AppShell(key: ValueKey('app'));
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<User?>(
@@ -95,6 +118,7 @@ class _AuthGateState extends State<AuthGate> {
         final firebaseUser = authSnapshot.data;
 
         if (firebaseUser == null) {
+          _hasShownStartupSplash = false;
           return const LoginScreen(key: ValueKey('login'));
         }
 
@@ -117,7 +141,6 @@ class _AuthGateState extends State<AuthGate> {
                 final serverSessionId = (data?['activeAppSessionId'] ?? '')
                     .toString();
 
-                // 🔥 KEY FIX — allow small delay instead of infinite wait
                 if (localSessionId.isEmpty || serverSessionId.isEmpty) {
                   return _loader();
                 }
@@ -127,9 +150,7 @@ class _AuthGateState extends State<AuthGate> {
                   return _loader();
                 }
 
-                return const SplashScreen(
-                  nextScreen: AppShell(key: ValueKey('app')),
-                );
+                return _loggedInApp();
               },
             );
           },
