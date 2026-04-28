@@ -114,6 +114,7 @@ class RazorpayService {
           'semester': semester,
           'amount': amount,
           'userEmail': email,
+          'userUid': user.uid,
           'userName': user.displayName ?? '',
         }),
       );
@@ -168,6 +169,7 @@ class RazorpayService {
           'semester': _semester,
           'amount': _amount,
           'userEmail': email,
+          'userUid': user?.uid ?? '',
           'userName': user?.displayName ?? '',
         }),
       );
