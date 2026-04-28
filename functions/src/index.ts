@@ -44,6 +44,7 @@ export const createRazorpayOrder = onRequest(
         const semester = (body.semester as string) || "";
         const amount = body.amount as number;
         const userEmail = body.userEmail as string;
+        const userUid = (body.userUid as string) || "";
         const userName = (body.userName as string) || "";
 
         if (!batchId || !batchName || !amount || !userEmail) {
@@ -65,6 +66,7 @@ export const createRazorpayOrder = onRequest(
             batchName,
             semester,
             userEmail,
+            userUid,
             userName,
           },
         });
@@ -107,6 +109,7 @@ export const verifyRazorpayPayment = onRequest(
         const semester = (body.semester as string) || "";
         const amount = body.amount as number;
         const userEmail = body.userEmail as string;
+        const userUid = (body.userUid as string) || "";
         const userName = (body.userName as string) || "";
 
         if (
@@ -148,6 +151,7 @@ export const verifyRazorpayPayment = onRequest(
           semester,
           amount: Number(amount || 0),
           userEmail,
+          userUid,
           userName,
           paymentGateway: "razorpay",
           paymentStatus: "paid",
@@ -157,17 +161,26 @@ export const verifyRazorpayPayment = onRequest(
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
 
-        const existingSubSnap = await db
-          .collection("subscriptions")
-          .where("userEmail", "==", userEmail)
-          .where("batchId", "==", batchId)
-          .limit(1)
-          .get();
+        const existingSubQuery = userUid
+          ? db
+            .collection("subscriptions")
+            .where("userUid", "==", userUid)
+            .where("batchId", "==", batchId)
+            .limit(1)
+          : db
+            .collection("subscriptions")
+            .where("userEmail", "==", userEmail)
+            .where("batchId", "==", batchId)
+            .limit(1);
+
+        const existingSubSnap = await existingSubQuery.get();
 
         if (!existingSubSnap.empty) {
           const subRef = existingSubSnap.docs[0].ref;
 
           await subRef.update({
+            userUid,
+            userEmail,
             batchName,
             semester,
             paymentStatus: "paid",
@@ -184,6 +197,7 @@ export const verifyRazorpayPayment = onRequest(
           });
         } else {
           await db.collection("subscriptions").add({
+            userUid,
             userEmail,
             userName,
             batchId,
