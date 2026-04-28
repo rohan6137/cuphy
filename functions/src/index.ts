@@ -325,6 +325,13 @@ export const sendNotificationOnCreate = onDocumentCreated(
           routeType: String(routeType),
           entityId: String(entityId),
         },
+        android: {
+          priority: "high",
+          notification: {
+            sound: "default",
+            channelId: "default",
+          },
+        },
       });
 
       logger.log("Notification sent", {
