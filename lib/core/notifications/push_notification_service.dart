@@ -16,6 +16,12 @@ import '../navigation/app_navigator.dart';
 class PushNotificationService {
   static final FirebaseMessaging _fcm = FirebaseMessaging.instance;
 
+  static Future<void> saveCurrentDeviceToken() async {
+    final token = await _fcm.getToken();
+    debugPrint('FCM TOKEN SAVED AGAIN: $token');
+    await _saveToken(token);
+  }
+
   static Future<void> init() async {
     await _fcm.requestPermission(alert: true, badge: true, sound: true);
 
@@ -43,6 +49,20 @@ class PushNotificationService {
         _handleTap(initialMessage.data);
       });
     }
+  }
+
+  static Future<void> removeCurrentDeviceToken() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final token = await _fcm.getToken();
+    if (token == null || token.isEmpty) return;
+
+    await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+      'fcmTokens': FieldValue.arrayRemove([token]),
+      'lastFcmToken': FieldValue.delete(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
   }
 
   static Future<void> _saveToken(String? token) async {

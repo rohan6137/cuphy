@@ -2,9 +2,11 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../../../core/notifications/push_notification_service.dart';
 
 class AuthService {
   AuthService();
@@ -70,6 +72,9 @@ class AuthService {
       'lastPlatform': 'app',
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+
+    // 🔥 CRITICAL FIX
+    await PushNotificationService.saveCurrentDeviceToken();
   }
 
   Future<bool> isCurrentAppSessionValid() async {
@@ -380,13 +385,15 @@ class AuthService {
 
   Future<void> logout() async {
     try {
+      await PushNotificationService.removeCurrentDeviceToken();
+    } catch (_) {}
+
+    try {
       await clearAppSessionIfCurrent();
-    } catch (_) {
-      // Logout must continue even if Firestore session clear fails.
-    } finally {
-      await _clearLocalAppSessionId();
-      await _auth.signOut();
-    }
+    } catch (_) {}
+
+    await _clearLocalAppSessionId();
+    await _auth.signOut();
   }
 
   User? get currentUser => _auth.currentUser;

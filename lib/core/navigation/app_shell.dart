@@ -23,7 +23,8 @@ class AppShell extends ConsumerStatefulWidget {
   ConsumerState<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends ConsumerState<AppShell> {
+class _AppShellState extends ConsumerState<AppShell>
+    with WidgetsBindingObserver {
   int _currentIndex = 0;
   DateTime? _lastBackPressed;
 
@@ -34,6 +35,76 @@ class _AppShellState extends ConsumerState<AppShell> {
     AllNotesScreen(),
     AllTestsScreen(),
   ];
+
+  bool _checkingSession = false;
+  bool _maintenanceMode = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+
+    _listenMaintenanceMode();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAppSession();
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkAppSession();
+    }
+  }
+
+  void _listenMaintenanceMode() {
+    FirebaseFirestore.instance
+        .collection('appSettings')
+        .doc('main')
+        .snapshots()
+        .listen((doc) {
+          final data = doc.data();
+
+          if (!mounted || data == null) return;
+
+          setState(() {
+            _maintenanceMode = data['maintenanceMode'] == true;
+          });
+        });
+  }
+
+  Future<void> _checkAppSession() async {
+    if (_checkingSession) return;
+    _checkingSession = true;
+
+    try {
+      final authService = ref.read(authServiceProvider);
+      final isValid = await authService.isCurrentAppSessionValid();
+
+      if (!isValid && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Another device login detected'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+
+        await Future.delayed(const Duration(milliseconds: 600));
+        await authService.forceLogoutLocalOnly();
+      }
+    } catch (_) {
+      // Do not break app flow if session check fails.
+    } finally {
+      _checkingSession = false;
+    }
+  }
 
   void _onTap(int index) {
     if (_currentIndex == index) return;
@@ -53,6 +124,105 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   @override
   Widget build(BuildContext context) {
+    if (_maintenanceMode) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF6F6FB),
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Container(
+                width: double.infinity,
+                constraints: const BoxConstraints(maxWidth: 420),
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: const Color(0xFFE8EAF2)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 22,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF6C3BFF).withOpacity(0.10),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Icon(
+                        Icons.settings_rounded,
+                        size: 34,
+                        color: Color(0xFF6C3BFF),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    const Text(
+                      'CUPHY',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF151A29),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Physics Made Powerful',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF697089),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'The platform is temporarily under maintenance.\nPlease check back soon.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.45,
+                        color: Color(0xFF697089),
+                      ),
+                    ),
+                    const SizedBox(height: 22),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 46,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          await ref.read(authControllerProvider).logout();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF6C3BFF),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: const Text(
+                          'Logout',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
