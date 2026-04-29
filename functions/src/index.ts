@@ -295,7 +295,6 @@ export const sendNotificationOnCreate = onDocumentCreated(
       if (!snap) return;
 
       const data = snap.data();
-
       if (!data || data.isActive !== true) return;
 
       const title = data.title || "CUPHY";
@@ -303,14 +302,13 @@ export const sendNotificationOnCreate = onDocumentCreated(
       const routeType = data.routeType || "";
       const entityId = data.entityId || "";
 
-      // 🔥 GET ALL USERS
-      const usersSnap = await db.collection("users").get();
+      const targetType = String(data.targetType || "all").toLowerCase();
+      const targetValue = data.targetValue ? String(data.targetValue) : "";
 
-      const tokenSet = new Set<string>();
-
-      usersSnap.forEach((doc) => {
-        const user = doc.data();
-
+      const collectTokensFromUserDoc = (
+        user: FirebaseFirestore.DocumentData,
+        tokenSet: Set<string>
+      ) => {
         if (user.lastFcmToken) {
           tokenSet.add(String(user.lastFcmToken));
         }
@@ -320,15 +318,109 @@ export const sendNotificationOnCreate = onDocumentCreated(
             if (token) tokenSet.add(String(token));
           });
         }
-      });
+      };
+
+      const tokenSet = new Set<string>();
+
+      if (targetType === "all") {
+        const usersSnap = await db.collection("users").get();
+
+        usersSnap.forEach((doc) => {
+          collectTokensFromUserDoc(doc.data(), tokenSet);
+        });
+      }
+
+      if (targetType === "user") {
+        const targetUid =
+          targetValue ||
+          String(data.targetUid || "") ||
+          String(data.targetUserId || "") ||
+          String(data.targetUserUid || "") ||
+          String(data.userUid || "");
+
+        if (!targetUid) {
+          logger.log("User notification skipped: missing target uid");
+          return;
+        }
+
+        const userDoc = await db.collection("users").doc(targetUid).get();
+
+        if (!userDoc.exists) {
+          logger.log("User notification skipped: user not found", {
+            targetUid,
+          });
+          return;
+        }
+
+        collectTokensFromUserDoc(userDoc.data() || {}, tokenSet);
+      }
+
+      if (targetType === "batch") {
+        const batchId = targetValue || String(data.targetBatchId || "");
+
+        if (!batchId) {
+          logger.log("Batch notification skipped: missing batch id");
+          return;
+        }
+
+        const subSnap = await db
+          .collection("subscriptions")
+          .where("batchId", "==", batchId)
+          .get();
+
+        const userUids = new Set<string>();
+
+        subSnap.forEach((doc) => {
+          const sub = doc.data();
+
+          const isAllowed =
+            sub.userUid &&
+            sub.expiredByAdmin !== true &&
+            (sub.active === true ||
+              sub.premiumUnlocked === true ||
+              sub.paymentStatus === "paid");
+
+          if (isAllowed) {
+            userUids.add(String(sub.userUid));
+          }
+        });
+        const enrollmentSnap = await db
+          .collection("enrollments")
+          .where("batchId", "==", batchId)
+          .get();
+
+        enrollmentSnap.forEach((doc) => {
+          const enrollment = doc.data();
+
+          const uid = String(enrollment.userUid || "");
+          const isAllowed =
+            uid &&
+            enrollment.expiredByAdmin !== true &&
+            enrollment.active !== false;
+
+          if (isAllowed) {
+            userUids.add(uid);
+          }
+        });
+        for (const uid of userUids) {
+          const userDoc = await db.collection("users").doc(uid).get();
+
+          if (userDoc.exists) {
+            collectTokensFromUserDoc(userDoc.data() || {}, tokenSet);
+          }
+        }
+      }
+
       const tokens = Array.from(tokenSet);
 
       if (tokens.length === 0) {
-        logger.log("No tokens found");
+        logger.log("No target tokens found", {
+          targetType,
+          targetValue,
+        });
         return;
       }
 
-      // 🔥 SEND NOTIFICATION
       const response = await admin.messaging().sendEachForMulticast({
         tokens,
         notification: {
@@ -348,7 +440,10 @@ export const sendNotificationOnCreate = onDocumentCreated(
         },
       });
 
-      logger.log("Notification sent", {
+      logger.log("Targeted notification sent", {
+        targetType,
+        targetValue,
+        tokenCount: tokens.length,
         successCount: response.successCount,
         failureCount: response.failureCount,
       });
