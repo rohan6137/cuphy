@@ -70,7 +70,22 @@ class PushNotificationService {
 
     if (user == null || token == null || token.isEmpty) return;
 
-    await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+    final db = FirebaseFirestore.instance;
+
+    final usersSnap = await db
+        .collection('users')
+        .where('fcmTokens', arrayContains: token)
+        .get();
+
+    for (final doc in usersSnap.docs) {
+      if (doc.id != user.uid) {
+        await doc.reference.update({
+          'fcmTokens': FieldValue.arrayRemove([token]),
+        });
+      }
+    }
+
+    await db.collection('users').doc(user.uid).set({
       'fcmTokens': FieldValue.arrayUnion([token]),
       'lastFcmToken': token,
       'updatedAt': FieldValue.serverTimestamp(),

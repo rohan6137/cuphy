@@ -383,6 +383,80 @@ class _HeaderBell extends StatelessWidget {
 
   final VoidCallback onTap;
 
+  Future<bool> _shouldShowNotification(
+    User user,
+    Map<String, dynamic> data,
+  ) async {
+    final targetType = (data['targetType'] ?? 'all').toString().toLowerCase();
+
+    if (targetType == 'all') return true;
+
+    if (targetType == 'user') {
+      final possibleUserIds = [
+        data['targetValue'],
+        data['targetUserUid'],
+        data['targetUserId'],
+        data['targetUid'],
+        data['userUid'],
+      ].map((e) => (e ?? '').toString()).where((e) => e.isNotEmpty).toList();
+
+      return possibleUserIds.contains(user.uid);
+    }
+
+    if (targetType == 'batch') {
+      final batchId =
+          (data['targetValue'] ??
+                  data['targetBatchId'] ??
+                  data['batchId'] ??
+                  '')
+              .toString();
+
+      if (batchId.isEmpty) return false;
+
+      // 🔥 Check subscriptions
+      final subSnap = await FirebaseFirestore.instance
+          .collection('subscriptions')
+          .where('userUid', isEqualTo: user.uid)
+          .where('batchId', isEqualTo: batchId)
+          .limit(1)
+          .get();
+
+      for (final doc in subSnap.docs) {
+        final sub = doc.data();
+
+        final allowed =
+            sub['expiredByAdmin'] != true &&
+            (sub['active'] == true ||
+                sub['premiumUnlocked'] == true ||
+                sub['paymentStatus'] == 'paid');
+
+        if (allowed) return true;
+      }
+
+      // 🔥 Check enrollments
+      final enrollmentSnap = await FirebaseFirestore.instance
+          .collection('enrollments')
+          .where('userUid', isEqualTo: user.uid)
+          .where('batchId', isEqualTo: batchId)
+          .limit(1)
+          .get();
+
+      for (final doc in enrollmentSnap.docs) {
+        final enrollment = doc.data();
+
+        final allowed =
+            enrollment['expiredByAdmin'] != true &&
+            enrollment['active'] != false;
+
+        if (allowed) return true;
+      }
+
+      return false;
+    }
+
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -406,28 +480,49 @@ class _HeaderBell extends StatelessWidget {
           builder: (context, readSnap) {
             final accountCreatedAt = user.metadata.creationTime;
 
-            final visibleNotifications = notifSnap.data!.docs.where((doc) {
-              final data = doc.data() as Map<String, dynamic>;
-              final createdAt = data['createdAt'];
+            return FutureBuilder<List<QueryDocumentSnapshot>>(
+              future: () async {
+                final filtered = <QueryDocumentSnapshot>[];
 
-              if (accountCreatedAt == null) return true;
-              if (createdAt is! Timestamp) return false;
+                for (final doc in notifSnap.data!.docs) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  final createdAt = data['createdAt'];
 
-              final notificationTime = createdAt.toDate();
+                  if (accountCreatedAt != null) {
+                    if (createdAt is! Timestamp) continue;
 
-              return notificationTime.isAfter(accountCreatedAt) ||
-                  notificationTime.isAtSameMomentAs(accountCreatedAt);
-            }).toList();
+                    final notificationTime = createdAt.toDate();
 
-            final readIds = (readSnap.data?.docs ?? [])
-                .map((d) => d.id)
-                .toSet();
+                    if (notificationTime.isBefore(accountCreatedAt)) {
+                      continue;
+                    }
+                  }
 
-            final unread = visibleNotifications
-                .where((doc) => !readIds.contains(doc.id))
-                .length;
+                  final allowed = await _shouldShowNotification(user, data);
 
-            return _buildBell(unread);
+                  if (allowed) {
+                    filtered.add(doc);
+                  }
+                }
+
+                return filtered;
+              }(),
+              builder: (context, filteredSnap) {
+                if (!filteredSnap.hasData) {
+                  return _buildBell(0);
+                }
+
+                final readIds = (readSnap.data?.docs ?? [])
+                    .map((d) => d.id)
+                    .toSet();
+
+                final unread = filteredSnap.data!
+                    .where((doc) => !readIds.contains(doc.id))
+                    .length;
+
+                return _buildBell(unread);
+              },
+            );
           },
         );
       },
@@ -454,7 +549,6 @@ class _HeaderBell extends StatelessWidget {
               color: Color(0xFF151A29),
             ),
           ),
-
           if (count > 0)
             Positioned(
               right: -3,

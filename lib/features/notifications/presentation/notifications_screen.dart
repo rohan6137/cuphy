@@ -51,6 +51,80 @@ class NotificationsScreen extends StatelessWidget {
     return '';
   }
 
+  Future<bool> _shouldShowNotification(
+    User user,
+    Map<String, dynamic> data,
+  ) async {
+    final targetType = (data['targetType'] ?? 'all').toString().toLowerCase();
+
+    if (targetType == 'all') return true;
+
+    if (targetType == 'user') {
+      final possibleUserIds = [
+        data['targetValue'],
+        data['targetUserUid'],
+        data['targetUserId'],
+        data['targetUid'],
+        data['userUid'],
+      ].map((e) => (e ?? '').toString()).where((e) => e.isNotEmpty).toList();
+
+      return possibleUserIds.contains(user.uid);
+    }
+
+    if (targetType == 'batch') {
+      final batchId =
+          (data['targetValue'] ??
+                  data['targetBatchId'] ??
+                  data['batchId'] ??
+                  '')
+              .toString();
+
+      if (batchId.isEmpty) return false;
+
+      // 🔥 Check subscriptions (paid users)
+      final subSnap = await FirebaseFirestore.instance
+          .collection('subscriptions')
+          .where('userUid', isEqualTo: user.uid)
+          .where('batchId', isEqualTo: batchId)
+          .limit(1)
+          .get();
+
+      for (final doc in subSnap.docs) {
+        final sub = doc.data();
+
+        final allowed =
+            sub['expiredByAdmin'] != true &&
+            (sub['active'] == true ||
+                sub['premiumUnlocked'] == true ||
+                sub['paymentStatus'] == 'paid');
+
+        if (allowed) return true;
+      }
+
+      // 🔥 Check enrollments (free/manual users)
+      final enrollmentSnap = await FirebaseFirestore.instance
+          .collection('enrollments')
+          .where('userUid', isEqualTo: user.uid)
+          .where('batchId', isEqualTo: batchId)
+          .limit(1)
+          .get();
+
+      for (final doc in enrollmentSnap.docs) {
+        final enrollment = doc.data();
+
+        final allowed =
+            enrollment['expiredByAdmin'] != true &&
+            enrollment['active'] != false;
+
+        if (allowed) return true;
+      }
+
+      return false;
+    }
+
+    return false;
+  }
+
   Future<void> _openExternalUrl(BuildContext context, String url) async {
     final uri = Uri.tryParse(url);
 
@@ -326,130 +400,154 @@ class NotificationsScreen extends StatelessWidget {
                 }
 
                 final accountCreatedAt = user.metadata.creationTime;
-
                 final allDocs = snapshot.data?.docs ?? [];
 
-                final docs = allDocs.where((doc) {
-                  final data = doc.data() as Map<String, dynamic>;
-                  final createdAt = data['createdAt'];
+                return FutureBuilder<List<QueryDocumentSnapshot>>(
+                  future: () async {
+                    final filtered = <QueryDocumentSnapshot>[];
 
-                  if (accountCreatedAt == null) return true;
-                  if (createdAt is! Timestamp) return false;
+                    for (final doc in allDocs) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      final createdAt = data['createdAt'];
 
-                  final notificationTime = createdAt.toDate();
+                      if (accountCreatedAt != null) {
+                        if (createdAt is! Timestamp) continue;
 
-                  return notificationTime.isAfter(accountCreatedAt) ||
-                      notificationTime.isAtSameMomentAs(accountCreatedAt);
-                }).toList();
+                        final notificationTime = createdAt.toDate();
 
-                if (docs.isEmpty) {
-                  return Center(
-                    child: Text(
-                      "No notifications yet",
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: _muted,
-                      ),
-                    ),
-                  );
-                }
+                        if (notificationTime.isBefore(accountCreatedAt)) {
+                          continue;
+                        }
+                      }
 
-                return ListView.builder(
-                  padding: const EdgeInsets.all(14),
-                  itemCount: docs.length,
-                  itemBuilder: (context, index) {
-                    final doc = docs[index];
-                    final data = doc.data() as Map<String, dynamic>;
+                      final allowed = await _shouldShowNotification(user, data);
 
-                    final title = (data['title'] ?? '').toString();
-                    final message = (data['message'] ?? '').toString();
-                    final createdAt = data['createdAt'] as Timestamp?;
+                      if (allowed) {
+                        filtered.add(doc);
+                      }
+                    }
 
-                    return StreamBuilder<DocumentSnapshot>(
-                      stream: FirebaseFirestore.instance
-                          .collection('users')
-                          .doc(user.uid)
-                          .collection('notificationReads')
-                          .doc(doc.id)
-                          .snapshots(),
-                      builder: (context, readSnap) {
-                        final isRead = readSnap.data?.exists ?? false;
+                    return filtered;
+                  }(),
+                  builder: (context, filteredSnap) {
+                    if (!filteredSnap.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
 
-                        return InkWell(
-                          borderRadius: BorderRadius.circular(18),
-                          onTap: () => _handleNotificationTap(
-                            context,
-                            user: user,
-                            notificationId: doc.id,
-                            data: data,
+                    final docs = filteredSnap.data!;
+
+                    if (docs.isEmpty) {
+                      return Center(
+                        child: Text(
+                          "No notifications yet",
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: _muted,
                           ),
-                          child: Container(
-                            margin: const EdgeInsets.only(bottom: 10),
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: isRead
-                                  ? Colors.white
-                                  : const Color(0xFFF1EEFF),
+                        ),
+                      );
+                    }
+
+                    return ListView.builder(
+                      padding: const EdgeInsets.all(14),
+                      itemCount: docs.length,
+                      itemBuilder: (context, index) {
+                        final doc = docs[index];
+                        final data = doc.data() as Map<String, dynamic>;
+
+                        final title = (data['title'] ?? '').toString();
+                        final message = (data['message'] ?? '').toString();
+                        final createdAt = data['createdAt'] as Timestamp?;
+
+                        return StreamBuilder<DocumentSnapshot>(
+                          stream: FirebaseFirestore.instance
+                              .collection('users')
+                              .doc(user.uid)
+                              .collection('notificationReads')
+                              .doc(doc.id)
+                              .snapshots(),
+                          builder: (context, readSnap) {
+                            final isRead = readSnap.data?.exists ?? false;
+
+                            return InkWell(
                               borderRadius: BorderRadius.circular(18),
-                              border: Border.all(
-                                color: isRead
-                                    ? const Color(0xFFE8EAF2)
-                                    : const Color(0xFF6C3BFF).withOpacity(0.4),
+                              onTap: () => _handleNotificationTap(
+                                context,
+                                user: user,
+                                notificationId: doc.id,
+                                data: data,
                               ),
-                            ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Icon(
-                                  Icons.notifications_rounded,
-                                  color: Color(0xFF6C3BFF),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        title,
-                                        style: GoogleFonts.inter(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w800,
-                                          color: _dark,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        message,
-                                        style: GoogleFonts.inter(
-                                          fontSize: 12.5,
-                                          color: _muted,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        _formatDate(createdAt),
-                                        style: GoogleFonts.inter(
-                                          fontSize: 11,
-                                          color: Colors.grey,
-                                        ),
-                                      ),
-                                    ],
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 10),
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  color: isRead
+                                      ? Colors.white
+                                      : const Color(0xFFF1EEFF),
+                                  borderRadius: BorderRadius.circular(18),
+                                  border: Border.all(
+                                    color: isRead
+                                        ? const Color(0xFFE8EAF2)
+                                        : const Color(
+                                            0xFF6C3BFF,
+                                          ).withOpacity(0.4),
                                   ),
                                 ),
-                                if (!isRead)
-                                  const Padding(
-                                    padding: EdgeInsets.only(top: 4),
-                                    child: Icon(
-                                      Icons.circle,
-                                      size: 8,
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Icon(
+                                      Icons.notifications_rounded,
                                       color: Color(0xFF6C3BFF),
                                     ),
-                                  ),
-                              ],
-                            ),
-                          ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            title,
+                                            style: GoogleFonts.inter(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w800,
+                                              color: _dark,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            message,
+                                            style: GoogleFonts.inter(
+                                              fontSize: 12.5,
+                                              color: _muted,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            _formatDate(createdAt),
+                                            style: GoogleFonts.inter(
+                                              fontSize: 11,
+                                              color: Colors.grey,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    if (!isRead)
+                                      const Padding(
+                                        padding: EdgeInsets.only(top: 4),
+                                        child: Icon(
+                                          Icons.circle,
+                                          size: 8,
+                                          color: Color(0xFF6C3BFF),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
                         );
                       },
                     );
