@@ -19,7 +19,7 @@
 
 
         <activity
-            android:name=".MainActivity"
+            android:name="in.cuphy.app.MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
             android:taskAffinity=""

@@ -1,4 +1,4 @@
-package com.example.cuphy_app
+package `in`.cuphy.app
 
 import io.flutter.embedding.android.FlutterActivity
 
